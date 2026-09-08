@@ -1,0 +1,6 @@
+{
+  "name": "StreamVault Video Streaming",
+  "description": "Production-ready video streaming platform with role-based access control, Super Admin and Manager studio dashboards, and Supabase integration.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
