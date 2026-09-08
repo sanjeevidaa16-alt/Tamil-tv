@@ -155,9 +155,6 @@ export const Videos: React.FC<VideosProps> = ({
             <Film className="w-7 h-7 text-rose-500" />
             <span>Videos</span>
           </h1>
-          <p className="text-xs text-slate-400 mt-0.5">
-            Browse high-fidelity cinematic streams, originals, and curated releases
-          </p>
         </div>
 
         {/* Search Input */}

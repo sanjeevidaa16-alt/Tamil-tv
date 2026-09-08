@@ -7,8 +7,6 @@ import {
   User as UserIcon,
   LogOut,
   ChevronDown,
-  Menu,
-  X,
   Database,
   Sliders,
   Sparkles,
@@ -29,7 +27,6 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPath, navigate }) => {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
-  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
 
   const activeLogo = headerLogoUrl || mainLogoUrl;
@@ -96,32 +93,6 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPath, navigate }) => {
                 )}
               </div>
             </button>
-
-            {/* Desktop Navigation Links */}
-            <nav className="hidden md:flex items-center gap-1 text-sm font-medium">
-              <button
-                id="nav-link-home"
-                onClick={() => navigate('/')}
-                className={`px-3 py-1.5 rounded-lg transition-colors ${
-                  currentPath === '/'
-                    ? 'text-white bg-slate-800/70 font-semibold'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800/40'
-                }`}
-              >
-                Home
-              </button>
-              <button
-                id="nav-link-videos"
-                onClick={() => navigate('/videos')}
-                className={`px-3 py-1.5 rounded-lg transition-colors ${
-                  currentPath.startsWith('/videos') && currentPath === '/videos'
-                    ? 'text-white bg-slate-800/70 font-semibold'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800/40'
-                }`}
-              >
-                Browse Videos
-              </button>
-            </nav>
           </div>
 
           {/* Right Section: Search, Role Portals, Profile */}
@@ -302,16 +273,6 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPath, navigate }) => {
                 </button>
               </div>
             )}
-
-            {/* Mobile Nav Hamburger */}
-            <button
-              id="mobile-nav-hamburger"
-              onClick={() => setIsMobileNavOpen(!isMobileNavOpen)}
-              className="md:hidden p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800"
-              aria-label="Toggle menu"
-            >
-              {isMobileNavOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-            </button>
           </div>
         </div>
 
@@ -328,52 +289,6 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPath, navigate }) => {
               />
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             </form>
-          </div>
-        )}
-
-        {/* Mobile Menu Drawer */}
-        {isMobileNavOpen && (
-          <div className="md:hidden border-t border-slate-800 bg-[#0d0f18] px-4 py-4 space-y-2">
-            <button
-              onClick={() => {
-                navigate('/');
-                setIsMobileNavOpen(false);
-              }}
-              className="w-full text-left px-3 py-2 rounded-xl text-slate-200 hover:bg-slate-800 text-sm font-medium"
-            >
-              Home
-            </button>
-            <button
-              onClick={() => {
-                navigate('/videos');
-                setIsMobileNavOpen(false);
-              }}
-              className="w-full text-left px-3 py-2 rounded-xl text-slate-200 hover:bg-slate-800 text-sm font-medium"
-            >
-              Browse Videos
-            </button>
-            {isAdmin && (
-              <button
-                onClick={() => {
-                  navigate('/admin');
-                  setIsMobileNavOpen(false);
-                }}
-                className="w-full text-left px-3 py-2 rounded-xl text-rose-400 bg-rose-950/30 text-sm font-semibold flex items-center gap-2"
-              >
-                <Shield className="w-4 h-4" /> Admin Studio
-              </button>
-            )}
-            {isManager && (
-              <button
-                onClick={() => {
-                  navigate('/manager');
-                  setIsMobileNavOpen(false);
-                }}
-                className="w-full text-left px-3 py-2 rounded-xl text-indigo-400 bg-indigo-950/30 text-sm font-semibold flex items-center gap-2"
-              >
-                <Briefcase className="w-4 h-4" /> Manager Studio
-              </button>
-            )}
           </div>
         )}
       </header>

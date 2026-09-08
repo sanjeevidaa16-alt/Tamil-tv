@@ -14,7 +14,6 @@ import {
   Briefcase,
   Menu,
   X,
-  ExternalLink,
   ChevronRight,
   Database,
   DollarSign,
@@ -173,15 +172,6 @@ export const StudioLayout: React.FC<StudioLayoutProps> = ({
             <span className="truncate">{isSupabaseConfigured ? 'Supabase Connected' : 'Demo DB Mode'}</span>
           </button>
 
-          {/* Exit to User Home */}
-          <button
-            onClick={() => navigate('/')}
-            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs text-slate-400 hover:text-white hover:bg-slate-800/60 transition-colors"
-          >
-            <ExternalLink className="w-4 h-4" />
-            <span>Open User Home</span>
-          </button>
-
           {/* Logout */}
           <button
             id="studio-logout-btn"
@@ -235,16 +225,10 @@ export const StudioLayout: React.FC<StudioLayoutProps> = ({
               </button>
             );
           })}
-          <div className="pt-2 border-t border-slate-800 flex gap-2">
-            <button
-              onClick={() => navigate('/')}
-              className="flex-1 py-2 rounded-xl bg-slate-800 text-xs text-white"
-            >
-              User Catalog
-            </button>
+          <div className="pt-2 border-t border-slate-800">
             <button
               onClick={handleSignOut}
-              className="flex-1 py-2 rounded-xl bg-rose-950/50 text-xs text-rose-400"
+              className="w-full py-2 rounded-xl bg-rose-950/50 text-xs text-rose-400 font-semibold"
             >
               Sign Out
             </button>
