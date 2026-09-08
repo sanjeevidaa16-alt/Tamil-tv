@@ -4,6 +4,7 @@ import { Category as CategoryType, Video } from '../../types';
 import { categoryService } from '../../services/categoryService';
 import { videoService } from '../../services/videoService';
 import { VideoCard } from '../../components/video/VideoCard';
+import { useAnalytics } from '../../contexts/AnalyticsContext';
 
 interface CategoryPageProps {
   slug: string;
@@ -11,6 +12,7 @@ interface CategoryPageProps {
 }
 
 export const CategoryPage: React.FC<CategoryPageProps> = ({ slug, navigate }) => {
+  const { trackCategoryView } = useAnalytics();
   const [category, setCategory] = useState<CategoryType | null>(null);
   const [videos, setVideos] = useState<Video[]>([]);
   const [loading, setLoading] = useState(true);
@@ -26,6 +28,7 @@ export const CategoryPage: React.FC<CategoryPageProps> = ({ slug, navigate }) =>
         setCategory(cat);
 
         if (cat) {
+          trackCategoryView(cat.id, cat.name);
           const res = await videoService.getPublishedVideos({ categoryId: cat.id });
           if (mounted) setVideos(res.videos);
         }
@@ -40,7 +43,7 @@ export const CategoryPage: React.FC<CategoryPageProps> = ({ slug, navigate }) =>
     return () => {
       mounted = false;
     };
-  }, [slug]);
+  }, [slug, trackCategoryView]);
 
   if (loading) {
     return (

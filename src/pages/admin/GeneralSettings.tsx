@@ -29,19 +29,40 @@ import {
 } from 'lucide-react';
 import { useSiteSettings } from '../../contexts/SiteSettingsContext';
 import { settingsService } from '../../services/settingsService';
-import { THEME_PRESETS } from '../../data/themes';
+import { THEME_PRESETS, EXTENDED_THEME_PRESETS } from '../../data/themes';
 import { SiteSettings, FooterSection, FooterLink, FooterSocialLink, ThemePreset } from '../../types';
+import { ExtendedThemePreset } from '../../types/theme';
 import { useToast } from '../../components/common/Toast';
 import { Footer } from '../../components/layout/Footer';
+import { ThemePresetsGrid } from '../../components/admin/ThemePresetsGrid';
+import { CustomThemeBuilder } from '../../components/admin/CustomThemeBuilder';
+import { UIDesignSettings } from '../../components/admin/UIDesignSettings';
+import { UserPanelDesignSettings } from '../../components/admin/UserPanelDesignSettings';
+import { LiveThemePreviewCanvas } from '../../components/admin/LiveThemePreviewCanvas';
 
 export const GeneralSettings: React.FC = () => {
-  const { settings: globalSettings, updateSettings, resetSettings } = useSiteSettings();
+  const {
+    settings: globalSettings,
+    updateSettings,
+    resetSettings,
+    applyPreviewTheme,
+    revertPreviewTheme,
+  } = useSiteSettings();
   const { showToast } = useToast();
 
   // Local editable form state
   const [formData, setFormData] = useState<SiteSettings>(globalSettings);
   const [activeTab, setActiveTab] = useState<
-    'identity' | 'branding' | 'theme' | 'footer' | 'social' | 'seo' | 'contact' | 'maintenance' | 'preview'
+    | 'identity'
+    | 'branding'
+    | 'theme'
+    | 'ui-design'
+    | 'footer'
+    | 'social'
+    | 'seo'
+    | 'contact'
+    | 'maintenance'
+    | 'preview'
   >('identity');
 
   const [saving, setSaving] = useState(false);
@@ -159,22 +180,47 @@ export const GeneralSettings: React.FC = () => {
   };
 
   // Theme Preset Selector handler
-  const handleSelectPreset = (preset: ThemePreset) => {
-    setFormData((prev) => ({
-      ...prev,
+  const handleSelectPreset = (preset: ExtendedThemePreset) => {
+    const next: SiteSettings = {
+      ...formData,
       theme_name: preset.name,
-      primary_color: preset.primary,
-      secondary_color: preset.secondary,
-      accent_color: preset.accent,
-      background_color: preset.background,
-      surface_color: preset.surface,
-      foreground_color: preset.foreground,
-      muted_color: preset.muted,
-      border_color: preset.border,
-      button_color: preset.button,
-      button_hover_color: preset.buttonHover,
-    }));
-    showToast(`Selected "${preset.name}". Click "Save Changes" to apply globally.`, 'info');
+      primary_color: preset.tokens.primary,
+      secondary_color: preset.tokens.secondary,
+      accent_color: preset.tokens.accent,
+      background_color: preset.tokens.background,
+      surface_color: preset.tokens.surface,
+      surface_secondary_color: preset.tokens.surfaceSecondary,
+      surface_tertiary_color: preset.tokens.surfaceTertiary,
+      card_bg_color: preset.tokens.cardBg,
+      card_border_color: preset.tokens.cardBorder,
+      text_color: preset.tokens.text,
+      foreground_color: preset.tokens.text,
+      muted_color: preset.tokens.textMuted,
+      border_color: preset.tokens.border,
+      border_strong_color: preset.tokens.borderStrong,
+      input_bg_color: preset.tokens.inputBg,
+      input_border_color: preset.tokens.inputBorder,
+      button_color: preset.tokens.buttonBg,
+      button_hover_color: preset.tokens.buttonHover,
+      player_bg_color: preset.tokens.playerBg,
+      player_progress_color: preset.tokens.playerProgress,
+      success_color: preset.tokens.success,
+      warning_color: preset.tokens.warning,
+      error_color: preset.tokens.error,
+      info_color: preset.tokens.info,
+    };
+    setFormData(next);
+    applyPreviewTheme(next);
+    showToast(`Applied "${preset.name}". Preview active live! Click "Save Changes" to persist.`, 'info');
+  };
+
+  const handleThemeOrStyleChange = (updated: Partial<SiteSettings>) => {
+    const next: SiteSettings = {
+      ...formData,
+      ...updated,
+    };
+    setFormData(next);
+    applyPreviewTheme(next);
   };
 
   // Footer Sections Management Helpers
@@ -367,12 +413,13 @@ export const GeneralSettings: React.FC = () => {
           { id: 'identity', label: '1. Identity', icon: Globe },
           { id: 'branding', label: '2. Logos & Branding', icon: ImageIcon },
           { id: 'theme', label: '3. Theme & Colors', icon: Palette },
-          { id: 'footer', label: '4. Footer CMS', icon: Layout },
-          { id: 'social', label: '5. Social Links', icon: Share2 },
-          { id: 'contact', label: '6. Contact Info', icon: Phone },
-          { id: 'seo', label: '7. SEO & Meta', icon: Globe },
-          { id: 'maintenance', label: '8. Maintenance', icon: ShieldAlert },
-          { id: 'preview', label: '9. Live Preview', icon: Eye },
+          { id: 'ui-design', label: '4. User Panel UI/UX', icon: Layers },
+          { id: 'footer', label: '5. Footer CMS', icon: Layout },
+          { id: 'social', label: '6. Social Links', icon: Share2 },
+          { id: 'contact', label: '7. Contact Info', icon: Phone },
+          { id: 'seo', label: '8. SEO & Meta', icon: Globe },
+          { id: 'maintenance', label: '9. Maintenance', icon: ShieldAlert },
+          { id: 'preview', label: '10. Live Preview', icon: Eye },
         ].map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -708,17 +755,17 @@ export const GeneralSettings: React.FC = () => {
 
       {/* 5. TAB 3: THEME & COLORS */}
       {activeTab === 'theme' && (
-        <div className="space-y-6">
+        <div className="space-y-8">
           {/* 15 Theme Presets Grid */}
           <div className="p-6 rounded-3xl bg-[#11131c] border border-slate-800 space-y-6">
             <div className="border-b border-slate-800 pb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
               <div>
                 <h3 className="text-base font-bold text-white flex items-center gap-2">
                   <Palette className="w-5 h-5 text-rose-400" />
-                  <span>15 Curated Theme Presets</span>
+                  <span>15 Curated Global Theme Presets</span>
                 </h3>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  Select a professionally tuned aesthetic palette. Selecting updates the preview and form tokens.
+                  Professional cinema palettes categorized by mood and tone. Choosing a preset updates live CSS variables instantly.
                 </p>
               </div>
 
@@ -727,187 +774,49 @@ export const GeneralSettings: React.FC = () => {
               </span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {THEME_PRESETS.map((preset) => {
-                const isSelected = formData.theme_name === preset.name;
-                return (
-                  <div
-                    key={preset.id}
-                    id={`theme-card-${preset.id}`}
-                    className={`p-4 rounded-2xl border transition-all relative cursor-pointer ${
-                      isSelected
-                        ? 'bg-slate-900 border-rose-500 shadow-lg shadow-rose-950/40 ring-1 ring-rose-500/50'
-                        : 'bg-slate-900/50 border-slate-800 hover:border-slate-700 hover:bg-slate-900/80'
-                    }`}
-                    onClick={() => handleSelectPreset(preset)}
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="text-xs font-bold text-white">{preset.name}</h4>
-                      {isSelected ? (
-                        <span className="flex items-center gap-1 text-[10px] font-bold text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded-full border border-rose-500/20">
-                          <Check className="w-3 h-3" /> Selected
-                        </span>
-                      ) : (
-                        <button
-                          type="button"
-                          className="text-[10px] font-semibold text-slate-400 hover:text-white px-2 py-0.5 rounded bg-slate-800"
-                        >
-                          Select
-                        </button>
-                      )}
-                    </div>
-
-                    <p className="text-[11px] text-slate-400 line-clamp-2 mb-3 min-h-[32px]">
-                      {preset.description}
-                    </p>
-
-                    {/* Color Swatch Dots */}
-                    <div className="flex items-center gap-1.5 pt-2 border-t border-slate-800/80">
-                      <div
-                        className="w-5 h-5 rounded-full border border-white/20 shadow-sm"
-                        style={{ backgroundColor: preset.primary }}
-                        title={`Primary: ${preset.primary}`}
-                      />
-                      <div
-                        className="w-5 h-5 rounded-full border border-white/20 shadow-sm"
-                        style={{ backgroundColor: preset.secondary }}
-                        title={`Secondary: ${preset.secondary}`}
-                      />
-                      <div
-                        className="w-5 h-5 rounded-full border border-white/20 shadow-sm"
-                        style={{ backgroundColor: preset.accent }}
-                        title={`Accent: ${preset.accent}`}
-                      />
-                      <div
-                        className="w-5 h-5 rounded-full border border-white/20 shadow-sm"
-                        style={{ backgroundColor: preset.background }}
-                        title={`Background: ${preset.background}`}
-                      />
-                      <div
-                        className="w-5 h-5 rounded-full border border-white/20 shadow-sm"
-                        style={{ backgroundColor: preset.surface }}
-                        title={`Surface: ${preset.surface}`}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+            <ThemePresetsGrid
+              selectedThemeName={formData.theme_name}
+              onSelectPreset={handleSelectPreset}
+            />
           </div>
 
-          {/* Custom Color Tokens Editor */}
+          {/* Custom Color Tokens & WCAG Contrast Engine */}
+          <div className="p-6 rounded-3xl bg-[#11131c] border border-slate-800 space-y-6">
+            <CustomThemeBuilder
+              formData={formData}
+              onChange={handleThemeOrStyleChange}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* 5.1 TAB 4: USER PANEL UI/UX DESIGN SYSTEM */}
+      {activeTab === 'ui-design' && (
+        <div className="space-y-8">
+          <UserPanelDesignSettings
+            onApplyDesign={async (designId) => {
+              const updated = { ...formData, user_panel_design: designId };
+              setFormData(updated);
+              await updateSettings(updated);
+            }}
+            isSaving={saving}
+          />
+
+          {/* Micro-Tuning UI Geometry & Elevation */}
           <div className="p-6 rounded-3xl bg-[#11131c] border border-slate-800 space-y-6">
             <div className="border-b border-slate-800 pb-4">
               <h3 className="text-base font-bold text-white flex items-center gap-2">
-                <Sliders className="w-5 h-5 text-amber-400" />
-                <span>Fine-Tune Custom Color Tokens</span>
+                <Sliders className="w-5 h-5 text-rose-400" />
+                <span>Micro-Tuning UI Geometry Tokens</span>
               </h3>
               <p className="text-xs text-slate-400 mt-0.5">
-                Override individual hex values to match exact brand guidelines. All values propagate to CSS variables seamlessly.
+                Fine-tune card elevation, surface blur, and corner curvature tokens on top of your selected User Panel design.
               </p>
             </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {/* Primary Color */}
-              <div className="p-3.5 bg-slate-900/60 rounded-2xl border border-slate-800 space-y-2">
-                <label className="text-[11px] font-bold text-slate-300 uppercase tracking-wider block">
-                  Primary Brand
-                </label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="color"
-                    value={formData.primary_color}
-                    onChange={(e) =>
-                      setFormData({ ...formData, primary_color: e.target.value, theme_name: 'Custom' })
-                    }
-                    className="w-8 h-8 rounded-lg bg-transparent cursor-pointer border-0"
-                  />
-                  <input
-                    type="text"
-                    value={formData.primary_color}
-                    onChange={(e) =>
-                      setFormData({ ...formData, primary_color: e.target.value, theme_name: 'Custom' })
-                    }
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-white font-mono uppercase"
-                  />
-                </div>
-              </div>
-
-              {/* Accent Color */}
-              <div className="p-3.5 bg-slate-900/60 rounded-2xl border border-slate-800 space-y-2">
-                <label className="text-[11px] font-bold text-slate-300 uppercase tracking-wider block">
-                  Accent Color
-                </label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="color"
-                    value={formData.accent_color}
-                    onChange={(e) =>
-                      setFormData({ ...formData, accent_color: e.target.value, theme_name: 'Custom' })
-                    }
-                    className="w-8 h-8 rounded-lg bg-transparent cursor-pointer border-0"
-                  />
-                  <input
-                    type="text"
-                    value={formData.accent_color}
-                    onChange={(e) =>
-                      setFormData({ ...formData, accent_color: e.target.value, theme_name: 'Custom' })
-                    }
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-white font-mono uppercase"
-                  />
-                </div>
-              </div>
-
-              {/* Background Color */}
-              <div className="p-3.5 bg-slate-900/60 rounded-2xl border border-slate-800 space-y-2">
-                <label className="text-[11px] font-bold text-slate-300 uppercase tracking-wider block">
-                  Canvas Background
-                </label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="color"
-                    value={formData.background_color}
-                    onChange={(e) =>
-                      setFormData({ ...formData, background_color: e.target.value, theme_name: 'Custom' })
-                    }
-                    className="w-8 h-8 rounded-lg bg-transparent cursor-pointer border-0"
-                  />
-                  <input
-                    type="text"
-                    value={formData.background_color}
-                    onChange={(e) =>
-                      setFormData({ ...formData, background_color: e.target.value, theme_name: 'Custom' })
-                    }
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-white font-mono uppercase"
-                  />
-                </div>
-              </div>
-
-              {/* Surface Color */}
-              <div className="p-3.5 bg-slate-900/60 rounded-2xl border border-slate-800 space-y-2">
-                <label className="text-[11px] font-bold text-slate-300 uppercase tracking-wider block">
-                  Card Surface
-                </label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="color"
-                    value={formData.surface_color}
-                    onChange={(e) =>
-                      setFormData({ ...formData, surface_color: e.target.value, theme_name: 'Custom' })
-                    }
-                    className="w-8 h-8 rounded-lg bg-transparent cursor-pointer border-0"
-                  />
-                  <input
-                    type="text"
-                    value={formData.surface_color}
-                    onChange={(e) =>
-                      setFormData({ ...formData, surface_color: e.target.value, theme_name: 'Custom' })
-                    }
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-white font-mono uppercase"
-                  />
-                </div>
-              </div>
-            </div>
+            <UIDesignSettings
+              formData={formData}
+              onChange={handleThemeOrStyleChange}
+            />
           </div>
         </div>
       )}
@@ -1530,25 +1439,35 @@ export const GeneralSettings: React.FC = () => {
         </div>
       )}
 
-      {/* 11. TAB 9: LIVE FOOTER PREVIEW */}
+      {/* 11. TAB 10: REAL-TIME INTERACTIVE LIVE PREVIEW */}
       {activeTab === 'preview' && (
-        <div className="space-y-6">
+        <div className="space-y-8">
+          {/* Full Design System Interactive Sandbox */}
+          <LiveThemePreviewCanvas
+            settings={formData}
+            onResetToCurrent={() => {
+              setFormData(globalSettings);
+              revertPreviewTheme();
+            }}
+          />
+
+          {/* Real-Time Live Footer Preview */}
           <div className="p-6 rounded-3xl bg-[#11131c] border border-slate-800 space-y-4">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-base font-bold text-white flex items-center gap-2">
                   <Eye className="w-5 h-5 text-rose-400" />
-                  <span>Real-Time Live Footer Preview</span>
+                  <span>Real-Time Public Footer Preview</span>
                 </h3>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  This preview renders the public footer exactly as it will appear with your current unsaved modifications.
+                  This preview renders the public footer exactly as it will appear with your current modifications.
                 </p>
               </div>
 
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow flex items-center gap-1.5"
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow flex items-center gap-1.5 transition-all"
               >
                 <Save className="w-3.5 h-3.5" />
                 <span>Save Live Version</span>
@@ -1576,7 +1495,10 @@ export const GeneralSettings: React.FC = () => {
 
         <div className="flex items-center gap-3">
           <button
-            onClick={() => setFormData(globalSettings)}
+            onClick={() => {
+              setFormData(globalSettings);
+              revertPreviewTheme();
+            }}
             disabled={!isDirty || saving}
             className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-xs font-semibold text-slate-300 transition-colors"
           >

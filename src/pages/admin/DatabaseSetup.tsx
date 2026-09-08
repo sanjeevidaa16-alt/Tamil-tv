@@ -187,6 +187,29 @@ BEGIN
         ALTER TABLE public.videos ADD COLUMN IF NOT EXISTS tags TEXT[] DEFAULT '{}';
         ALTER TABLE public.videos ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
         ALTER TABLE public.videos ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+
+        -- Video Publishing & Premiere System Columns
+        ALTER TABLE public.videos ADD COLUMN IF NOT EXISTS publish_mode TEXT DEFAULT 'publish_now';
+        ALTER TABLE public.videos ADD COLUMN IF NOT EXISTS published_at TIMESTAMPTZ DEFAULT NOW();
+        ALTER TABLE public.videos ADD COLUMN IF NOT EXISTS scheduled_at TIMESTAMPTZ;
+        ALTER TABLE public.videos ADD COLUMN IF NOT EXISTS premiere_enabled BOOLEAN DEFAULT false;
+        ALTER TABLE public.videos ADD COLUMN IF NOT EXISTS premiere_at TIMESTAMPTZ;
+        ALTER TABLE public.videos ADD COLUMN IF NOT EXISTS premiere_timezone TEXT DEFAULT 'Asia/Kolkata';
+        ALTER TABLE public.videos ADD COLUMN IF NOT EXISTS premiere_title TEXT;
+        ALTER TABLE public.videos ADD COLUMN IF NOT EXISTS premiere_message TEXT;
+        ALTER TABLE public.videos ADD COLUMN IF NOT EXISTS premiere_countdown_enabled BOOLEAN DEFAULT true;
+        ALTER TABLE public.videos ADD COLUMN IF NOT EXISTS premiere_countdown_duration INTEGER DEFAULT 2;
+        ALTER TABLE public.videos ADD COLUMN IF NOT EXISTS premiere_reminder_enabled BOOLEAN DEFAULT true;
+        ALTER TABLE public.videos ADD COLUMN IF NOT EXISTS premiere_chat_enabled BOOLEAN DEFAULT true;
+        ALTER TABLE public.videos ADD COLUMN IF NOT EXISTS premiere_show_thumbnail BOOLEAN DEFAULT true;
+        ALTER TABLE public.videos ADD COLUMN IF NOT EXISTS premiere_started_at TIMESTAMPTZ;
+        ALTER TABLE public.videos ADD COLUMN IF NOT EXISTS premiere_completed_at TIMESTAMPTZ;
+        ALTER TABLE public.videos ADD COLUMN IF NOT EXISTS premiere_cancelled_at TIMESTAMPTZ;
+        ALTER TABLE public.videos ADD COLUMN IF NOT EXISTS reminders_count INTEGER DEFAULT 0;
+
+        -- Update status check constraint to include all premiere states
+        ALTER TABLE public.videos DROP CONSTRAINT IF EXISTS videos_status_check;
+        ALTER TABLE public.videos ADD CONSTRAINT videos_status_check CHECK (status IN ('published', 'draft', 'unlisted', 'unpublished', 'scheduled_premiere', 'premiere_live', 'premiere_completed', 'cancelled'));
     END IF;
 END $$;
 
@@ -196,6 +219,16 @@ CREATE TABLE IF NOT EXISTS public.video_views (
     video_id UUID NOT NULL REFERENCES public.videos(id) ON DELETE CASCADE,
     user_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 10B. VIDEO_PREMIERE_REMINDERS TABLE
+CREATE TABLE IF NOT EXISTS public.video_premiere_reminders (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    video_id UUID NOT NULL REFERENCES public.videos(id) ON DELETE CASCADE,
+    user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+    email TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(video_id, user_id)
 );
 
 -- 11. HELPER SECURITY FUNCTIONS & SECURE ROLE MANAGEMENT
@@ -443,9 +476,10 @@ DROP POLICY IF EXISTS "Allow video select" ON public.videos;
 CREATE POLICY "Allow video select"
     ON public.videos FOR SELECT
     USING (
-        (status = 'published' AND visibility = 'public')
+        (status IN ('published', 'scheduled_premiere', 'premiere_live', 'premiere_completed') AND visibility = 'public')
+        OR (visibility = 'preview')
         OR public.is_admin()
-        OR (public.is_manager() AND (status = 'published' OR uploaded_by = auth.uid() OR uploader_id = auth.uid()))
+        OR (public.is_manager() AND (status IN ('published', 'scheduled_premiere', 'premiere_live', 'premiere_completed') OR uploaded_by = auth.uid() OR uploader_id = auth.uid()))
         OR (auth.uid() IS NOT NULL AND (uploaded_by = auth.uid() OR uploader_id = auth.uid()))
     );
 
@@ -473,12 +507,24 @@ CREATE POLICY "Allow video delete for admin and owner"
         OR (public.is_manager() AND (uploaded_by = auth.uid() OR uploader_id = auth.uid()))
     );
 
+-- 12B. VIDEO PREMIERE REMINDERS POLICIES
+ALTER TABLE public.video_premiere_reminders ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow select reminders" ON public.video_premiere_reminders;
+CREATE POLICY "Allow select reminders" ON public.video_premiere_reminders FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Allow insert reminders" ON public.video_premiere_reminders;
+CREATE POLICY "Allow insert reminders" ON public.video_premiere_reminders FOR INSERT WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow delete reminders" ON public.video_premiere_reminders;
+CREATE POLICY "Allow delete reminders" ON public.video_premiere_reminders FOR DELETE USING (auth.uid() = user_id OR public.is_admin());
+
 -- 13. TABLE GRANTS & FUNCTIONS
 GRANT ALL ON TABLE public.profiles TO authenticated, anon, service_role;
 GRANT ALL ON TABLE public.admin_activity_logs TO authenticated, anon, service_role;
 GRANT ALL ON TABLE public.categories TO authenticated, anon, service_role;
 GRANT ALL ON TABLE public.videos TO authenticated, anon, service_role;
 GRANT ALL ON TABLE public.video_views TO authenticated, anon, service_role;
+GRANT ALL ON TABLE public.video_premiere_reminders TO authenticated, anon, service_role;
 GRANT EXECUTE ON FUNCTION public.change_user_role(UUID, TEXT) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.delete_video(UUID) TO authenticated, anon;
 GRANT EXECUTE ON FUNCTION public.is_admin() TO authenticated, anon;

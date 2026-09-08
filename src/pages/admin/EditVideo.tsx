@@ -10,12 +10,14 @@ import {
   Lock,
   Globe,
   Tag,
+  Clock,
 } from 'lucide-react';
 import { Video, Category, VideoStatus, VideoVisibility } from '../../types';
 import { videoService } from '../../services/videoService';
 import { categoryService } from '../../services/categoryService';
 import { settingsService } from '../../services/settingsService';
 import { useToast } from '../../components/common/Toast';
+import { formatDuration } from '../../utils/formatters';
 
 interface EditVideoProps {
   videoId: string;
@@ -217,6 +219,17 @@ export const EditVideo: React.FC<EditVideoProps> = ({ videoId, onSuccess, onCanc
               <option value="private">Private</option>
               <option value="preview">Preview</option>
             </select>
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5 flex items-center gap-1.5">
+            <Clock className="w-3.5 h-3.5 text-rose-400" />
+            <span>Video Duration (Calculated Automatically)</span>
+          </label>
+          <div className="w-full bg-[#181a26] border border-slate-700/80 rounded-xl px-4 py-2.5 text-xs text-slate-300 font-mono flex items-center justify-between">
+            <span className="font-bold text-white">{formatDuration(video?.duration || 0)}</span>
+            <span className="text-slate-500">{video?.duration || 0} seconds</span>
           </div>
         </div>
 

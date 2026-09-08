@@ -1,7 +1,9 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { SiteSettings } from '../types';
 import { settingsService } from '../services/settingsService';
-import { DEFAULT_SITE_SETTINGS_CONFIG, THEME_PRESETS } from '../data/themes';
+import { DEFAULT_SITE_SETTINGS_CONFIG, EXTENDED_THEME_PRESETS } from '../data/themes';
+import { applyThemeToDOM as applyTokensToRoot, deriveCompleteTokens } from '../utils/themeEngine';
+import { ThemeTokens, UIStyleId } from '../types/theme';
 
 interface SiteSettingsContextType {
   settings: SiteSettings;
@@ -9,6 +11,8 @@ interface SiteSettingsContextType {
   updateSettings: (newSettings: Partial<SiteSettings>) => Promise<SiteSettings>;
   resetSettings: () => Promise<void>;
   refreshSettings: () => Promise<void>;
+  applyPreviewTheme: (previewConfig: Partial<SiteSettings>) => void;
+  revertPreviewTheme: () => void;
   siteName: string;
   siteShortName: string;
   siteTagline: string;
@@ -26,20 +30,61 @@ export const SiteSettingsProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const [settings, setSettings] = useState<SiteSettings>(DEFAULT_SITE_SETTINGS_CONFIG);
   const [loading, setLoading] = useState(true);
 
-  const applyThemeToDOM = (cfg: SiteSettings) => {
+  const applyTheme = (cfg: SiteSettings) => {
     if (typeof document === 'undefined') return;
 
-    const root = document.documentElement;
-    root.style.setProperty('--primary', cfg.primary_color);
-    root.style.setProperty('--secondary', cfg.secondary_color);
-    root.style.setProperty('--accent', cfg.accent_color);
-    root.style.setProperty('--background', cfg.background_color);
-    root.style.setProperty('--surface', cfg.surface_color);
-    root.style.setProperty('--foreground', cfg.foreground_color);
-    root.style.setProperty('--muted', cfg.muted_color);
-    root.style.setProperty('--border', cfg.border_color);
-    root.style.setProperty('--button', cfg.button_color);
-    root.style.setProperty('--button-hover', cfg.button_hover_color);
+    // Try finding matching extended theme preset or derive complete tokens
+    const matchedPreset = EXTENDED_THEME_PRESETS.find(
+      (p) => p.name.toLowerCase() === (cfg.theme_name || '').toLowerCase()
+    );
+
+    const tokens: ThemeTokens = matchedPreset
+      ? {
+          ...matchedPreset.tokens,
+          primary: cfg.primary_color || matchedPreset.tokens.primary,
+          secondary: cfg.secondary_color || matchedPreset.tokens.secondary,
+          accent: cfg.accent_color || matchedPreset.tokens.accent,
+          background: cfg.background_color || matchedPreset.tokens.background,
+          surface: cfg.surface_color || matchedPreset.tokens.surface,
+          text: cfg.text_color || cfg.foreground_color || matchedPreset.tokens.text,
+          border: cfg.border_color || matchedPreset.tokens.border,
+          buttonBg: cfg.button_color || matchedPreset.tokens.buttonBg,
+          buttonHover: cfg.button_hover_color || matchedPreset.tokens.buttonHover,
+          cardBg: cfg.card_bg_color || cfg.surface_color || matchedPreset.tokens.cardBg,
+          cardBorder: cfg.card_border_color || cfg.border_color || matchedPreset.tokens.cardBorder,
+          inputBg: cfg.input_bg_color || matchedPreset.tokens.inputBg,
+          inputBorder: cfg.input_border_color || matchedPreset.tokens.inputBorder,
+          playerBg: cfg.player_bg_color || matchedPreset.tokens.playerBg,
+          playerProgress: cfg.player_progress_color || cfg.primary_color || matchedPreset.tokens.playerProgress,
+        }
+      : deriveCompleteTokens({
+          primary: cfg.primary_color,
+          secondary: cfg.secondary_color,
+          accent: cfg.accent_color,
+          background: cfg.background_color,
+          surface: cfg.surface_color,
+          text: cfg.text_color || cfg.foreground_color,
+          border: cfg.border_color,
+          buttonBg: cfg.button_color,
+          buttonHover: cfg.button_hover_color,
+          cardBg: cfg.card_bg_color,
+          cardBorder: cfg.card_border_color,
+          inputBg: cfg.input_bg_color,
+          inputBorder: cfg.input_border_color,
+          playerBg: cfg.player_bg_color,
+          playerProgress: cfg.player_progress_color,
+        });
+
+    const activeUIStyle: UIStyleId = (cfg.ui_style as UIStyleId) || 'modern-minimal';
+
+    applyTokensToRoot(tokens, cfg.theme_name || 'custom', activeUIStyle, {
+      borderRadiusScale: cfg.border_radius_scale,
+      shadowStrength: cfg.card_shadow_strength,
+      spacingDensity: cfg.spacing_density,
+      fontScale: cfg.font_scale,
+      animationLevel: cfg.animation_level,
+      glassEffect: cfg.glass_effect,
+    });
 
     // Update document title & metadata
     if (cfg.meta_title || cfg.site_name) {
@@ -63,7 +108,7 @@ export const SiteSettingsProvider: React.FC<{ children: React.ReactNode }> = ({ 
     try {
       const data = await settingsService.getSiteSettings();
       setSettings(data);
-      applyThemeToDOM(data);
+      applyTheme(data);
     } catch (err) {
       console.warn('Failed to load site settings:', err);
     } finally {
@@ -78,18 +123,27 @@ export const SiteSettingsProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const updateSettings = async (newSettings: Partial<SiteSettings>): Promise<SiteSettings> => {
     const updated = await settingsService.updateSiteSettings(newSettings);
     setSettings(updated);
-    applyThemeToDOM(updated);
+    applyTheme(updated);
     return updated;
   };
 
   const resetSettings = async () => {
     const resetData = await settingsService.resetSiteSettings();
     setSettings(resetData);
-    applyThemeToDOM(resetData);
+    applyTheme(resetData);
   };
 
   const refreshSettings = async () => {
     await loadSettings();
+  };
+
+  const applyPreviewTheme = (previewConfig: Partial<SiteSettings>) => {
+    const merged = { ...settings, ...previewConfig };
+    applyTheme(merged);
+  };
+
+  const revertPreviewTheme = () => {
+    applyTheme(settings);
   };
 
   const mainLogoUrl = settings.main_logo_url;
@@ -110,6 +164,8 @@ export const SiteSettingsProvider: React.FC<{ children: React.ReactNode }> = ({ 
         updateSettings,
         resetSettings,
         refreshSettings,
+        applyPreviewTheme,
+        revertPreviewTheme,
         siteName,
         siteShortName,
         siteTagline,

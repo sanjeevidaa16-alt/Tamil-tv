@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Film, Lock, Mail, User as UserIcon, ArrowRight, Loader2, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../components/common/Toast';
+import { useAnalytics } from '../../contexts/AnalyticsContext';
 
 interface SignupProps {
   navigate: (path: string) => void;
@@ -10,6 +11,7 @@ interface SignupProps {
 export const Signup: React.FC<SignupProps> = ({ navigate }) => {
   const { signUp } = useAuth();
   const { showToast } = useToast();
+  const { trackAuth } = useAnalytics();
 
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
@@ -17,6 +19,14 @@ export const Signup: React.FC<SignupProps> = ({ navigate }) => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+
+  const sanitizeRedirect = (url: string | null): string => {
+    if (!url) return '/';
+    if (url.startsWith('/') && !url.startsWith('//') && !url.toLowerCase().includes('javascript:')) {
+      return url;
+    }
+    return '/';
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,23 +53,49 @@ export const Signup: React.FC<SignupProps> = ({ navigate }) => {
     if (error) {
       showToast(error.message || 'Signup failed', 'error');
     } else {
+      trackAuth('sign_up', 'email_password');
       setIsSuccess(true);
       showToast('Account created successfully!', 'success');
       setTimeout(() => {
-        navigate('/');
+        const urlParams = new URLSearchParams(window.location.search);
+        const queryRedirect = urlParams.get('redirect');
+        const storedRedirect = sessionStorage.getItem('STREAMVAULT_REDIRECT_URL');
+        const rawRedirect = queryRedirect || storedRedirect;
+        sessionStorage.removeItem('STREAMVAULT_REDIRECT_URL');
+        const safeRedirect = sanitizeRedirect(rawRedirect);
+        navigate(safeRedirect || '/');
       }, 1500);
     }
   };
 
   return (
     <div id="signup-page" className="min-h-[85vh] flex items-center justify-center px-4 py-12">
-      <div className="w-full max-w-md bg-[#11131d] border border-slate-800 rounded-3xl p-8 shadow-2xl relative">
+      <div
+        className="w-full max-w-md border p-8 shadow-2xl relative transition-all"
+        style={{
+          backgroundColor: 'var(--color-surface, #11131d)',
+          borderColor: 'var(--color-border, #1e2233)',
+          borderRadius: 'var(--card-radius, 24px)',
+          boxShadow: 'var(--card-shadow, 0 20px 40px -15px rgba(0,0,0,0.6))',
+        }}
+      >
         <div className="text-center mb-8">
-          <div className="inline-flex w-12 h-12 rounded-2xl bg-gradient-to-tr from-rose-600 to-amber-500 items-center justify-center shadow-lg shadow-rose-900/40 mb-3">
+          <div
+            className="inline-flex w-12 h-12 rounded-2xl items-center justify-center shadow-lg mb-3 text-white"
+            style={{ backgroundColor: 'var(--color-primary, #e11d48)' }}
+          >
             <Film className="w-6 h-6 text-white" />
           </div>
-          <h1 className="text-2xl font-black text-white tracking-tight">Create StreamVault Account</h1>
-          <p className="text-xs text-slate-400 mt-1">
+          <h1
+            className="text-2xl font-black tracking-tight"
+            style={{ color: 'var(--color-text, #ffffff)' }}
+          >
+            Create StreamVault Account
+          </h1>
+          <p
+            className="text-xs mt-1"
+            style={{ color: 'var(--color-text-muted, #94a3b8)' }}
+          >
             Standard user accounts can stream, browse, and search all published content.
           </p>
         </div>
@@ -67,13 +103,26 @@ export const Signup: React.FC<SignupProps> = ({ navigate }) => {
         {isSuccess ? (
           <div className="text-center py-8 space-y-4">
             <CheckCircle2 className="w-16 h-16 text-emerald-400 mx-auto animate-bounce" />
-            <h3 className="text-lg font-bold text-white">Registration Complete</h3>
-            <p className="text-xs text-slate-400">Taking you to your streaming dashboard...</p>
+            <h3
+              className="text-lg font-bold"
+              style={{ color: 'var(--color-text, #ffffff)' }}
+            >
+              Registration Complete
+            </h3>
+            <p
+              className="text-xs"
+              style={{ color: 'var(--color-text-muted, #94a3b8)' }}
+            >
+              Taking you to your streaming dashboard...
+            </p>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
+              <label
+                className="block text-xs font-semibold uppercase tracking-wider mb-1.5"
+                style={{ color: 'var(--color-text-muted, #94a3b8)' }}
+              >
                 Full Name
               </label>
               <div className="relative">
@@ -84,14 +133,23 @@ export const Signup: React.FC<SignupProps> = ({ navigate }) => {
                   placeholder="Jane Doe"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
-                  className="w-full bg-[#181a26] border border-slate-700/80 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-rose-500 transition-colors"
+                  className="w-full border pl-10 pr-4 py-2.5 text-sm placeholder-slate-500 focus:outline-none transition-colors"
+                  style={{
+                    backgroundColor: 'var(--color-input-background, #181a26)',
+                    borderColor: 'var(--color-input-border, #2a2f42)',
+                    borderRadius: 'var(--input-radius, 12px)',
+                    color: 'var(--color-text, #ffffff)',
+                  }}
                 />
                 <UserIcon className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
+              <label
+                className="block text-xs font-semibold uppercase tracking-wider mb-1.5"
+                style={{ color: 'var(--color-text-muted, #94a3b8)' }}
+              >
                 Email Address
               </label>
               <div className="relative">
@@ -102,14 +160,23 @@ export const Signup: React.FC<SignupProps> = ({ navigate }) => {
                   placeholder="jane@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full bg-[#181a26] border border-slate-700/80 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-rose-500 transition-colors"
+                  className="w-full border pl-10 pr-4 py-2.5 text-sm placeholder-slate-500 focus:outline-none transition-colors"
+                  style={{
+                    backgroundColor: 'var(--color-input-background, #181a26)',
+                    borderColor: 'var(--color-input-border, #2a2f42)',
+                    borderRadius: 'var(--input-radius, 12px)',
+                    color: 'var(--color-text, #ffffff)',
+                  }}
                 />
                 <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
+              <label
+                className="block text-xs font-semibold uppercase tracking-wider mb-1.5"
+                style={{ color: 'var(--color-text-muted, #94a3b8)' }}
+              >
                 Password
               </label>
               <div className="relative">
@@ -120,14 +187,23 @@ export const Signup: React.FC<SignupProps> = ({ navigate }) => {
                   placeholder="At least 6 characters"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full bg-[#181a26] border border-slate-700/80 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-rose-500 transition-colors"
+                  className="w-full border pl-10 pr-4 py-2.5 text-sm placeholder-slate-500 focus:outline-none transition-colors"
+                  style={{
+                    backgroundColor: 'var(--color-input-background, #181a26)',
+                    borderColor: 'var(--color-input-border, #2a2f42)',
+                    borderRadius: 'var(--input-radius, 12px)',
+                    color: 'var(--color-text, #ffffff)',
+                  }}
                 />
                 <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
+              <label
+                className="block text-xs font-semibold uppercase tracking-wider mb-1.5"
+                style={{ color: 'var(--color-text-muted, #94a3b8)' }}
+              >
                 Confirm Password
               </label>
               <div className="relative">
@@ -138,13 +214,22 @@ export const Signup: React.FC<SignupProps> = ({ navigate }) => {
                   placeholder="Repeat password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full bg-[#181a26] border border-slate-700/80 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-rose-500 transition-colors"
+                  className="w-full border pl-10 pr-4 py-2.5 text-sm placeholder-slate-500 focus:outline-none transition-colors"
+                  style={{
+                    backgroundColor: 'var(--color-input-background, #181a26)',
+                    borderColor: 'var(--color-input-border, #2a2f42)',
+                    borderRadius: 'var(--input-radius, 12px)',
+                    color: 'var(--color-text, #ffffff)',
+                  }}
                 />
                 <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
               </div>
             </div>
 
-            <p className="text-[11px] text-slate-400">
+            <p
+              className="text-[11px]"
+              style={{ color: 'var(--color-text-muted, #94a3b8)' }}
+            >
               * Notice: Uploading videos is strictly restricted to Super Admins and authorized Managers. Standard members enjoy streaming and viewing privileges.
             </p>
 
@@ -152,7 +237,12 @@ export const Signup: React.FC<SignupProps> = ({ navigate }) => {
               type="submit"
               id="signup-submit-btn"
               disabled={loading}
-              className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-semibold text-sm shadow-xl shadow-rose-950/50 hover:shadow-rose-900/80 transition-all disabled:opacity-50"
+              className="w-full flex items-center justify-center gap-2 py-3 px-4 font-semibold text-sm shadow-xl transition-all disabled:opacity-50 hover:opacity-90"
+              style={{
+                backgroundColor: 'var(--button-primary-bg, #e11d48)',
+                color: 'var(--button-primary-text, #ffffff)',
+                borderRadius: 'var(--button-radius, 12px)',
+              }}
             >
               {loading ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -166,12 +256,20 @@ export const Signup: React.FC<SignupProps> = ({ navigate }) => {
           </form>
         )}
 
-        <div className="mt-6 text-center text-xs text-slate-400">
+        <div
+          className="mt-6 text-center text-xs"
+          style={{ color: 'var(--color-text-muted, #94a3b8)' }}
+        >
           Already registered?{' '}
           <button
             id="signup-to-login-link"
-            onClick={() => navigate('/login')}
-            className="text-rose-400 hover:text-rose-300 font-semibold"
+            onClick={() => {
+              const urlParams = new URLSearchParams(window.location.search);
+              const redirectParam = urlParams.get('redirect');
+              navigate(redirectParam ? `/login?redirect=${encodeURIComponent(redirectParam)}` : '/login');
+            }}
+            className="font-semibold hover:underline"
+            style={{ color: 'var(--color-primary, #e11d48)' }}
           >
             Sign In
           </button>

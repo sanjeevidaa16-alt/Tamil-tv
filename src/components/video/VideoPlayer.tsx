@@ -16,11 +16,19 @@ import {
 } from 'lucide-react';
 import { formatDuration } from '../../utils/formatters';
 import { mediaStorage } from '../../utils/mediaStorage';
+import { useUserPanelDesign } from '../../contexts/UserPanelDesignContext';
+import { useAnalytics } from '../../contexts/AnalyticsContext';
 
 interface VideoPlayerProps {
   src: string;
   poster?: string | null;
   title?: string;
+  videoId?: string;
+  category?: string;
+  channelName?: string;
+  showName?: string;
+  episodeName?: string;
+  language?: string;
   onEnded?: () => void;
   onTimeUpdate?: (currentTime: number, duration: number) => void;
   autoPlay?: boolean;
@@ -29,7 +37,13 @@ interface VideoPlayerProps {
 export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   src,
   poster,
-  title,
+  title = 'Untitled Video',
+  videoId = 'unknown',
+  category,
+  channelName,
+  showName,
+  episodeName,
+  language,
   onEnded,
   onTimeUpdate,
   autoPlay = false,
@@ -37,6 +51,32 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const progressContainerRef = useRef<HTMLDivElement>(null);
+
+  const { activeDesign } = useUserPanelDesign();
+  const {
+    trackVideoPlay,
+    trackVideoPause,
+    trackVideoResume,
+    trackVideoMilestone,
+    trackVideoComplete,
+    trackVideoSeek,
+    trackVideoFullscreen,
+    trackVideoMute,
+    trackVideoSpeedChange,
+  } = useAnalytics();
+  const playerConfig = activeDesign.player;
+
+  // Track milestones once per playback session
+  const milestonesRef = useRef({
+    25: false,
+    50: false,
+    75: false,
+    90: false,
+    completed: false,
+    hasStarted: false,
+  });
+
+  const lastSeekFromRef = useRef<number | null>(null);
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -87,6 +127,29 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     };
   }, [poster]);
 
+  const videoMeta = {
+    video_id: videoId,
+    video_title: title,
+    video_category: category,
+    channel_name: channelName,
+    show_name: showName,
+    episode_name: episodeName,
+    language: language,
+    video_source: src,
+  };
+
+  // Reset milestone tracking when source changes
+  useEffect(() => {
+    milestonesRef.current = {
+      25: false,
+      50: false,
+      75: false,
+      90: false,
+      completed: false,
+      hasStarted: false,
+    };
+  }, [resolvedSrc]);
+
   // Initialize playback state & video properties
   useEffect(() => {
     const video = videoRef.current;
@@ -102,12 +165,54 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     };
 
     const handleTimeUpdate = () => {
-      setCurrentTime(video.currentTime);
-      onTimeUpdate?.(video.currentTime, video.duration || 0);
+      const cur = video.currentTime;
+      const dur = video.duration || 0;
+      setCurrentTime(cur);
+      onTimeUpdate?.(cur, dur);
+
+      if (dur > 0) {
+        const pct = (cur / dur) * 100;
+        if (pct >= 25 && !milestonesRef.current[25]) {
+          milestonesRef.current[25] = true;
+          trackVideoMilestone(25, videoMeta, cur, dur);
+        }
+        if (pct >= 50 && !milestonesRef.current[50]) {
+          milestonesRef.current[50] = true;
+          trackVideoMilestone(50, videoMeta, cur, dur);
+        }
+        if (pct >= 75 && !milestonesRef.current[75]) {
+          milestonesRef.current[75] = true;
+          trackVideoMilestone(75, videoMeta, cur, dur);
+        }
+        if (pct >= 90 && !milestonesRef.current[90]) {
+          milestonesRef.current[90] = true;
+          trackVideoMilestone(90, videoMeta, cur, dur);
+        }
+      }
     };
 
-    const handlePlay = () => setIsPlaying(true);
-    const handlePause = () => setIsPlaying(false);
+    const handlePlay = () => {
+      setIsPlaying(true);
+      const cur = video.currentTime;
+      const dur = video.duration || 0;
+      if (!milestonesRef.current.hasStarted) {
+        milestonesRef.current.hasStarted = true;
+        trackVideoPlay(videoMeta, cur, dur);
+      } else {
+        trackVideoResume(videoMeta, cur, dur);
+      }
+    };
+
+    const handlePause = () => {
+      setIsPlaying(false);
+      const cur = video.currentTime;
+      const dur = video.duration || 0;
+      // Do not send pause on natural completion
+      if (dur === 0 || cur < dur - 0.5) {
+        trackVideoPause(videoMeta, cur, dur);
+      }
+    };
+
     const handleWaiting = () => setIsBuffering(true);
     const handlePlaying = () => {
       setIsBuffering(false);
@@ -120,6 +225,10 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     };
     const handleVideoEnded = () => {
       setIsPlaying(false);
+      if (!milestonesRef.current.completed) {
+        milestonesRef.current.completed = true;
+        trackVideoComplete(videoMeta, video.duration || 0);
+      }
       onEnded?.();
     };
 
@@ -142,7 +251,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       video.removeEventListener('error', handleError);
       video.removeEventListener('ended', handleVideoEnded);
     };
-  }, [resolvedSrc, onEnded, onTimeUpdate]);
+  }, [resolvedSrc, onEnded, onTimeUpdate, videoId, title, category]);
 
   // Fullscreen change listener
   useEffect(() => {
@@ -223,6 +332,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     const newMuted = !isMuted;
     video.muted = newMuted;
     setIsMuted(newMuted);
+    trackVideoMute(videoMeta, newMuted);
   };
 
   const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -238,7 +348,10 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const seekDelta = (seconds: number) => {
     const video = videoRef.current;
     if (!video) return;
-    video.currentTime = Math.min(Math.max(0, video.currentTime + seconds), duration);
+    const prevTime = video.currentTime;
+    const newTime = Math.min(Math.max(0, video.currentTime + seconds), duration);
+    video.currentTime = newTime;
+    trackVideoSeek(videoMeta, prevTime, newTime);
   };
 
   const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -246,10 +359,13 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     const bar = progressContainerRef.current;
     if (!video || !bar) return;
 
+    const prevTime = video.currentTime;
     const rect = bar.getBoundingClientRect();
     const clickX = e.clientX - rect.left;
     const ratio = Math.max(0, Math.min(1, clickX / rect.width));
-    video.currentTime = ratio * duration;
+    const newTime = ratio * duration;
+    video.currentTime = newTime;
+    trackVideoSeek(videoMeta, prevTime, newTime);
   };
 
   const handleProgressMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -270,7 +386,10 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     const container = containerRef.current;
     if (!container) return;
 
-    if (!document.fullscreenElement) {
+    const willBeFullscreen = !document.fullscreenElement;
+    trackVideoFullscreen(videoMeta, willBeFullscreen);
+
+    if (willBeFullscreen) {
       container.requestFullscreen?.().catch(console.warn);
     } else {
       document.exitFullscreen?.().catch(console.warn);
@@ -296,6 +415,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     if (videoRef.current) {
       videoRef.current.playbackRate = rate;
     }
+    trackVideoSpeedChange(videoMeta, rate);
     setShowSpeedMenu(false);
   };
 
@@ -307,8 +427,30 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       id="cinema-video-player-container"
       onMouseMove={handleMouseMove}
       onMouseLeave={() => isPlaying && setShowControls(false)}
-      className="relative w-full aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl group select-none flex items-center justify-center border border-slate-800/80"
+      className="relative w-full aspect-video rounded-2xl overflow-hidden shadow-2xl group select-none flex items-center justify-center border transition-all"
+      style={{
+        backgroundColor: 'var(--player-bg, #000000)',
+        borderColor: 'var(--color-border, rgba(255, 255, 255, 0.08))',
+        borderRadius: playerConfig.radius || 'var(--card-radius, 16px)',
+      }}
     >
+      {/* Channel Watermark (Tamil TV Classic & Channel Hub) */}
+      {playerConfig.showChannelWatermark && (
+        <div className="absolute top-4 right-4 z-20 flex items-center gap-2 pointer-events-none opacity-85">
+          <span className="px-2.5 py-1 rounded bg-black/70 border border-white/20 text-white font-black text-[10px] tracking-wider uppercase backdrop-blur-sm">
+            TAMIL TV HD
+          </span>
+        </div>
+      )}
+
+      {/* Live Badge for Broadcast modes */}
+      {playerConfig.showLiveBadge && (
+        <div className="absolute top-4 left-4 z-20 flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-rose-600 text-white font-bold text-[10px] uppercase tracking-wider shadow-lg pointer-events-none">
+          <span className="w-2 h-2 rounded-full bg-white animate-ping" />
+          <span>LIVE BROADCAST</span>
+        </div>
+      )}
+
       {/* Video Element (Strictly NO autoplay with sound) */}
       <video
         ref={videoRef}
@@ -354,7 +496,10 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           {/* Buffering Indicator */}
           {isBuffering && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/40 pointer-events-none z-20">
-              <Loader2 className="w-12 h-12 text-rose-500 animate-spin" />
+              <Loader2
+                className="w-12 h-12 animate-spin"
+                style={{ color: 'var(--player-progress, var(--color-primary, #e11d48))' }}
+              />
             </div>
           )}
 
@@ -363,7 +508,11 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             <button
               id="center-play-button"
               onClick={togglePlay}
-              className="absolute z-20 w-18 h-18 sm:w-20 sm:h-20 flex items-center justify-center rounded-full bg-rose-600/90 text-white shadow-2xl shadow-rose-600/50 backdrop-blur-sm hover:scale-110 active:scale-95 transition-all duration-200"
+              className="absolute z-20 w-18 h-18 sm:w-20 sm:h-20 flex items-center justify-center rounded-full text-white shadow-2xl backdrop-blur-sm hover:scale-110 active:scale-95 transition-all duration-200"
+              style={{
+                backgroundColor: 'var(--player-progress, var(--color-primary, #e11d48))',
+                boxShadow: '0 10px 30px -5px var(--player-progress, rgba(225, 29, 72, 0.6))',
+              }}
               aria-label="Play video"
             >
               <Play className="w-8 h-8 sm:w-9 sm:h-9 ml-1 fill-white" />
@@ -386,8 +535,14 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       {/* Control Bar Overlay */}
       <div
         id="video-controls-overlay"
-        className={`absolute bottom-0 inset-x-0 p-3 sm:p-5 bg-gradient-to-t from-black/95 via-black/70 to-transparent z-30 transition-opacity duration-300 ${
+        className={`z-30 transition-opacity duration-300 ${
           showControls || !isPlaying ? 'opacity-100' : 'opacity-0 pointer-events-none'
+        } ${
+          playerConfig.controlBarPosition === 'glass-pill'
+            ? 'absolute bottom-3 inset-x-3 sm:bottom-4 sm:inset-x-6 p-3 sm:p-4 rounded-2xl bg-white/10 backdrop-blur-xl border border-white/20 shadow-2xl'
+            : playerConfig.controlBarPosition === 'floating-bottom'
+            ? 'absolute bottom-3 inset-x-3 sm:bottom-4 sm:inset-x-5 p-3 sm:p-4 rounded-xl bg-slate-950/90 backdrop-blur-md border border-white/10 shadow-2xl'
+            : 'absolute bottom-0 inset-x-0 p-3 sm:p-5 bg-gradient-to-t from-black/95 via-black/70 to-transparent'
         }`}
       >
         {/* Timeline Progress Bar */}
@@ -403,8 +558,11 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           <div className="w-full h-1.5 bg-slate-700/80 rounded-full group-hover/progress:h-2 transition-all">
             {/* Played Bar */}
             <div
-              className="h-full bg-rose-600 rounded-full relative"
-              style={{ width: `${progressPercent}%` }}
+              className="h-full rounded-full relative transition-[width] duration-75"
+              style={{
+                width: `${progressPercent}%`,
+                backgroundColor: 'var(--player-progress, var(--color-primary, #e11d48))',
+              }}
             >
               {/* Scrubber thumb handle */}
               <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-3.5 h-3.5 bg-white rounded-full shadow-lg scale-0 group-hover/progress:scale-100 transition-transform" />
@@ -475,7 +633,10 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                 step="0.05"
                 value={isMuted ? 0 : volume}
                 onChange={handleVolumeChange}
-                className="w-16 sm:w-20 h-1 bg-slate-700 accent-rose-500 rounded-lg cursor-pointer"
+                className="w-16 sm:w-20 h-1 bg-slate-700 rounded-lg cursor-pointer"
+                style={{
+                  accentColor: 'var(--player-progress, var(--color-primary, #e11d48))',
+                }}
                 aria-label="Volume level"
               />
             </div>
@@ -502,19 +663,31 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               {showSpeedMenu && (
                 <div
                   id="player-speed-menu"
-                  className="absolute bottom-full right-0 mb-2 py-1.5 bg-[#141620] border border-slate-700 rounded-xl shadow-xl z-40 text-xs w-24"
+                  className="absolute bottom-full right-0 mb-2 py-1.5 border shadow-xl z-40 text-xs w-24"
+                  style={{
+                    backgroundColor: 'var(--color-surface, #141620)',
+                    borderColor: 'var(--color-border, #2a2f42)',
+                    borderRadius: 'var(--card-radius, 12px)',
+                  }}
                 >
                   <p className="px-3 py-1 text-[10px] text-slate-400 font-bold uppercase tracking-wider">Speed</p>
                   {[0.5, 0.75, 1, 1.25, 1.5, 2].map((rate) => (
                     <button
                       key={rate}
                       onClick={() => changeSpeed(rate)}
-                      className={`w-full text-left px-3 py-1.5 hover:bg-rose-600 hover:text-white transition-colors flex items-center justify-between ${
-                        playbackRate === rate ? 'text-rose-400 font-bold' : 'text-slate-300'
-                      }`}
+                      className="w-full text-left px-3 py-1.5 hover:bg-white/10 transition-colors flex items-center justify-between"
+                      style={{
+                        color: playbackRate === rate ? 'var(--color-primary, #e11d48)' : 'var(--color-text-muted, #94a3b8)',
+                        fontWeight: playbackRate === rate ? 'bold' : 'normal',
+                      }}
                     >
                       <span>{rate}x</span>
-                      {playbackRate === rate && <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />}
+                      {playbackRate === rate && (
+                        <span
+                          className="w-1.5 h-1.5 rounded-full"
+                          style={{ backgroundColor: 'var(--color-primary, #e11d48)' }}
+                        />
+                      )}
                     </button>
                   ))}
                 </div>

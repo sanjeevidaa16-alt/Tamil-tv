@@ -89,10 +89,11 @@ export const Footer: React.FC<FooterProps> = ({ navigate, previewSettings }) => 
   return (
     <footer
       id="app-footer"
-      className="w-full bg-[#07080c] border-t border-slate-800/80 mt-auto py-12 text-slate-400 text-xs transition-colors"
+      className="w-full mt-auto py-12 text-xs transition-colors border-t"
       style={{
-        backgroundColor: settings.background_color ? `${settings.background_color}` : undefined,
-        borderColor: settings.border_color ? `${settings.border_color}` : undefined,
+        backgroundColor: 'var(--footer-bg, var(--color-surface, #07080c))',
+        borderColor: 'var(--footer-border, var(--color-border, rgba(255, 255, 255, 0.08)))',
+        color: 'var(--color-text-muted, #94a3b8)',
       }}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -112,18 +113,24 @@ export const Footer: React.FC<FooterProps> = ({ navigate, previewSettings }) => 
               ) : (
                 <div
                   className="w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold"
-                  style={{ backgroundColor: settings.primary_color || '#e11d48' }}
+                  style={{ backgroundColor: 'var(--color-primary, #e11d48)' }}
                 >
                   <Film className="w-4 h-4" />
                 </div>
               )}
-              <span className="text-base font-black text-white font-['Cabinet_Grotesk',sans-serif] tracking-tight">
+              <span
+                className="text-base font-black font-['Cabinet_Grotesk',sans-serif] tracking-tight"
+                style={{ color: 'var(--color-text, #ffffff)' }}
+              >
                 {footerName}
               </span>
             </div>
 
             {footerDesc ? (
-              <p className="text-slate-400 max-w-sm leading-relaxed text-xs">
+              <p
+                className="max-w-sm leading-relaxed text-xs"
+                style={{ color: 'var(--color-text-muted, #94a3b8)' }}
+              >
                 {footerDesc}
               </p>
             ) : null}
@@ -166,7 +173,11 @@ export const Footer: React.FC<FooterProps> = ({ navigate, previewSettings }) => 
                     target="_blank"
                     rel="noopener noreferrer"
                     title={soc.label}
-                    className="w-7 h-7 rounded-lg bg-slate-900/80 border border-slate-800 hover:border-slate-700 flex items-center justify-center transition-colors hover:scale-105"
+                    className="w-7 h-7 rounded-lg border flex items-center justify-center transition-colors hover:scale-105"
+                    style={{
+                      backgroundColor: 'var(--color-surface-secondary, #141624)',
+                      borderColor: 'var(--color-border, #1e2233)',
+                    }}
                   >
                     {getSocialIcon(soc.platform)}
                   </a>
@@ -184,7 +195,10 @@ export const Footer: React.FC<FooterProps> = ({ navigate, previewSettings }) => 
 
               return (
                 <div key={section.id} className="space-y-3">
-                  <h4 className="text-xs font-bold text-white uppercase tracking-wider">
+                  <h4
+                    className="text-xs font-bold uppercase tracking-wider"
+                    style={{ color: 'var(--color-text, #ffffff)' }}
+                  >
                     {section.title}
                   </h4>
                   {enabledLinks.length > 0 ? (
@@ -193,18 +207,19 @@ export const Footer: React.FC<FooterProps> = ({ navigate, previewSettings }) => 
                         <li key={link.id}>
                           <button
                             onClick={() => handleLinkClick(link)}
-                            className="hover:text-white transition-colors text-left flex items-center gap-1.5"
+                            className="transition-colors text-left flex items-center gap-1.5 hover:opacity-80"
+                            style={{ color: 'var(--color-text-muted, #94a3b8)' }}
                           >
                             <span>{link.label}</span>
                             {link.url.startsWith('http') && (
-                              <ExternalLink className="w-3 h-3 text-slate-500" />
+                              <ExternalLink className="w-3 h-3 opacity-60" />
                             )}
                           </button>
                         </li>
                       ))}
                     </ul>
                   ) : (
-                    <p className="text-[11px] text-slate-600 italic">No active links</p>
+                    <p className="text-[11px] opacity-40 italic">No active links</p>
                   )}
                 </div>
               );
@@ -213,29 +228,35 @@ export const Footer: React.FC<FooterProps> = ({ navigate, previewSettings }) => 
             {/* Optional Contact column if any contact field is filled */}
             {(settings.contact_email || settings.contact_phone || settings.contact_address) && (
               <div className="space-y-3">
-                <h4 className="text-xs font-bold text-white uppercase tracking-wider">
+                <h4
+                  className="text-xs font-bold uppercase tracking-wider"
+                  style={{ color: 'var(--color-text, #ffffff)' }}
+                >
                   Contact
                 </h4>
-                <ul className="space-y-2 text-[11px] text-slate-400">
+                <ul
+                  className="space-y-2 text-[11px]"
+                  style={{ color: 'var(--color-text-muted, #94a3b8)' }}
+                >
                   {settings.contact_email && (
                     <li className="flex items-center gap-2">
-                      <Mail className="w-3.5 h-3.5 text-slate-500" />
-                      <a href={`mailto:${settings.contact_email}`} className="hover:text-white truncate">
+                      <Mail className="w-3.5 h-3.5 opacity-60" />
+                      <a href={`mailto:${settings.contact_email}`} className="hover:underline truncate">
                         {settings.contact_email}
                       </a>
                     </li>
                   )}
                   {settings.contact_phone && (
                     <li className="flex items-center gap-2">
-                      <Phone className="w-3.5 h-3.5 text-slate-500" />
-                      <a href={`tel:${settings.contact_phone}`} className="hover:text-white">
+                      <Phone className="w-3.5 h-3.5 opacity-60" />
+                      <a href={`tel:${settings.contact_phone}`} className="hover:underline">
                         {settings.contact_phone}
                       </a>
                     </li>
                   )}
                   {settings.contact_address && (
                     <li className="flex items-start gap-2">
-                      <MapPin className="w-3.5 h-3.5 text-slate-500 mt-0.5 shrink-0" />
+                      <MapPin className="w-3.5 h-3.5 opacity-60 mt-0.5 shrink-0" />
                       <span>{settings.contact_address}</span>
                     </li>
                   )}
@@ -246,13 +267,19 @@ export const Footer: React.FC<FooterProps> = ({ navigate, previewSettings }) => 
         </div>
 
         {/* Footer Bottom / Copyright */}
-        <div className="pt-6 border-t border-slate-800/60 flex flex-col sm:flex-row items-center justify-between gap-3 text-[11px] text-slate-500">
+        <div
+          className="pt-6 border-t flex flex-col sm:flex-row items-center justify-between gap-3 text-[11px]"
+          style={{
+            borderColor: 'var(--color-border, rgba(255, 255, 255, 0.08))',
+            color: 'var(--color-text-muted, #94a3b8)',
+          }}
+        >
           <p>
             © {settings.auto_copyright_year ? `${currentYear} ` : ''}
             {copyrightNotice}
           </p>
           {settings.footer_disclaimer && (
-            <p className="text-slate-500 text-center sm:text-right">
+            <p className="text-center sm:text-right opacity-70">
               {settings.footer_disclaimer}
             </p>
           )}

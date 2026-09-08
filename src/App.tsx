@@ -1,11 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { SiteSettingsProvider, useSiteSettings } from './contexts/SiteSettingsContext';
+import { UserPanelDesignProvider } from './contexts/UserPanelDesignContext';
 import { AdSenseProvider } from './contexts/AdSenseContext';
 import { AdsterraProvider } from './contexts/AdsterraContext';
+import { AnalyticsProvider, useAnalytics } from './contexts/AnalyticsContext';
+import { CookieConsentBanner } from './components/common/CookieConsentBanner';
 import { ToastProvider } from './components/common/Toast';
 import { Navbar } from './components/layout/Navbar';
 import { Footer } from './components/layout/Footer';
+import { UserPanelBottomNav } from './components/layout/UserPanelBottomNav';
 import { AdPlacementSlot } from './components/ads/AdPlacementSlot';
 import { AdsterraSlot } from './components/ads/AdsterraSlot';
 import { Videos } from './pages/user/Videos';
@@ -26,6 +30,7 @@ import { Wrench, Shield, Film, ArrowRight } from 'lucide-react';
 function AppContent() {
   const { user, role, isAdmin, isManager, loading: authLoading } = useAuth();
   const { settings, isMaintenanceMode, siteName, mainLogoUrl } = useSiteSettings();
+  const { trackPageView } = useAnalytics();
   const [currentPath, setCurrentPath] = useState(() => window.location.pathname || '/');
   const [searchParams, setSearchParams] = useState(() => window.location.search);
 
@@ -38,6 +43,12 @@ function AppContent() {
     window.addEventListener('popstate', handleLocationChange);
     return () => window.removeEventListener('popstate', handleLocationChange);
   }, []);
+
+  // GA4 SPA Page View Tracking
+  useEffect(() => {
+    const isInternal = currentPath.startsWith('/admin') || currentPath.startsWith('/manager');
+    trackPageView(currentPath, document.title, isInternal);
+  }, [currentPath, trackPageView]);
 
   const navigate = (path: string) => {
     if (path !== currentPath) {
@@ -246,8 +257,14 @@ function AppContent() {
 
       <Footer navigate={navigate} />
 
+      {/* User Panel Design-driven Bottom Navigation */}
+      <UserPanelBottomNav currentPath={currentPath} navigate={navigate} />
+
       {/* 4. Footer Bottom Placement */}
       <AdPlacementSlot placementKey="footer_bottom" />
+
+      {/* Google Analytics 4 User Consent Banner */}
+      <CookieConsentBanner />
     </div>
   );
 }
@@ -256,13 +273,17 @@ export default function App() {
   return (
     <ToastProvider>
       <SiteSettingsProvider>
-        <AuthProvider>
-          <AdSenseProvider>
-            <AdsterraProvider>
-              <AppContent />
-            </AdsterraProvider>
-          </AdSenseProvider>
-        </AuthProvider>
+        <UserPanelDesignProvider>
+          <AuthProvider>
+            <AdSenseProvider>
+              <AdsterraProvider>
+                <AnalyticsProvider>
+                  <AppContent />
+                </AnalyticsProvider>
+              </AdsterraProvider>
+            </AdSenseProvider>
+          </AuthProvider>
+        </UserPanelDesignProvider>
       </SiteSettingsProvider>
     </ToastProvider>
   );

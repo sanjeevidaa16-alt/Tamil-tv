@@ -19,7 +19,7 @@ import { videoService } from '../../services/videoService';
 import { settingsService } from '../../services/settingsService';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../components/common/Toast';
-import { formatFileSize } from '../../utils/formatters';
+import { formatFileSize, formatDuration, getVideoFileDuration } from '../../utils/formatters';
 
 interface UploadVideoProps {
   onSuccess: () => void;
@@ -41,6 +41,7 @@ export const UploadVideo: React.FC<UploadVideoProps> = ({ onSuccess, onCancel })
 
   // Files
   const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [videoDuration, setVideoDuration] = useState<number>(0);
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
   const [thumbnailUrlInput, setThumbnailUrlInput] = useState('');
   const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
@@ -61,7 +62,7 @@ export const UploadVideo: React.FC<UploadVideoProps> = ({ onSuccess, onCancel })
     categoryService.getCategories().then(setCategories).catch(console.error);
   }, []);
 
-  const handleVideoSelect = (file: File) => {
+  const handleVideoSelect = async (file: File) => {
     // Validate format
     const validExtensions = ['mp4', 'webm', 'mov', 'm4v'];
     const ext = file.name.split('.').pop()?.toLowerCase() || '';
@@ -79,6 +80,10 @@ export const UploadVideo: React.FC<UploadVideoProps> = ({ onSuccess, onCancel })
 
     setVideoFile(file);
     setErrorMessage(null);
+
+    const dur = await getVideoFileDuration(file);
+    setVideoDuration(dur);
+
     if (!title) {
       // Auto-populate clean title from filename
       const cleanTitle = file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
@@ -133,6 +138,7 @@ export const UploadVideo: React.FC<UploadVideoProps> = ({ onSuccess, onCancel })
         isFeatured,
         uploaderId: user.id,
         videoFile,
+        duration: videoDuration > 0 ? videoDuration : undefined,
         thumbnailFile: thumbnailFile || undefined,
         thumbnailUrl: thumbnailUrlInput.trim() || undefined,
         onProgress: (pct) => setUploadProgress(pct),
@@ -234,7 +240,9 @@ export const UploadVideo: React.FC<UploadVideoProps> = ({ onSuccess, onCancel })
                     <FileVideo className="w-6 h-6" />
                   </div>
                   <p className="font-bold text-sm text-white">{videoFile.name}</p>
-                  <p className="text-xs text-slate-400 font-mono">{formatFileSize(videoFile.size)}</p>
+                  <p className="text-xs text-slate-400 font-mono">
+                    {formatFileSize(videoFile.size)} {videoDuration > 0 ? `• ${formatDuration(videoDuration)}` : '• Calculating duration...'}
+                  </p>
                   <span className="text-xs text-emerald-400 font-medium">
                     Click or drag another file to replace
                   </span>

@@ -1,36 +1,246 @@
 @import "tailwindcss";
 
 :root {
-  --primary: #e11d48;
-  --secondary: #9333ea;
-  --accent: #f59e0b;
-  --background: #07080e;
-  --surface: #0f111a;
-  --foreground: #f8fafc;
-  --muted: #94a3b8;
-  --border: #1e293b;
-  --button: #e11d48;
-  --button-hover: #be123c;
+  /* 1. Core Backgrounds */
+  --color-background: #07080c;
+  --color-surface: #11131c;
+  --color-surface-secondary: #181b28;
+  --color-surface-tertiary: #202436;
+
+  /* 2. Typography Colors */
+  --color-text: #f8fafc;
+  --color-text-secondary: #cbd5e1;
+  --color-text-muted: #94a3b8;
+  --color-text-inverse: #ffffff;
+
+  /* 3. Primary Color Suite */
+  --color-primary: #e11d48;
+  --color-primary-hover: #be123c;
+  --color-primary-active: #9f1239;
+  --color-primary-foreground: #ffffff;
+
+  /* 4. Secondary & Accent */
+  --color-secondary: #9333ea;
+  --color-secondary-hover: #7e22ce;
+  --color-secondary-foreground: #ffffff;
+  --color-accent: #fb7185;
+  --color-accent-hover: #f43f5e;
+
+  /* 5. Borders & Dividers */
+  --color-border: #1e2233;
+  --color-border-strong: #2d334d;
+  --color-divider: rgba(30, 34, 51, 0.7);
+
+  /* 6. Form Inputs */
+  --color-input-background: #151724;
+  --color-input-border: #23283c;
+  --color-input-focus: #e11d48;
+
+  /* 7. Buttons */
+  --color-button-background: #e11d48;
+  --color-button-text: #ffffff;
+  --color-button-hover: #be123c;
+
+  /* 8. Links */
+  --color-link: #fb7185;
+  --color-link-hover: #fda4af;
+
+  /* 9. Feedback & Status */
+  --color-success: #10b981;
+  --color-success-background: rgba(16, 185, 129, 0.15);
+  --color-warning: #f59e0b;
+  --color-warning-background: rgba(245, 158, 11, 0.15);
+  --color-error: #ef4444;
+  --color-error-background: rgba(239, 68, 68, 0.15);
+  --color-info: #38bdf8;
+  --color-info-background: rgba(56, 189, 248, 0.15);
+
+  /* 10. Overlays & Backdrops */
+  --color-overlay: rgba(4, 5, 8, 0.8);
+  --color-backdrop: rgba(7, 8, 12, 0.9);
+
+  /* 11. Video Player Custom Properties */
+  --color-player-background: #050609;
+  --color-player-controls: rgba(17, 19, 28, 0.95);
+  --color-player-progress: #e11d48;
+  --color-player-progress-background: rgba(255, 255, 255, 0.2);
+
+  /* 12. Component Geometry & Elevation */
+  --card-bg: #11131c;
+  --card-border: #1e2233;
+  --card-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4);
+  --card-radius: 14px;
+  --card-backdrop-blur: 0px;
+
+  --button-radius: 12px;
+  --input-radius: 12px;
+  --modal-radius: 16px;
+
+  --nav-bg: #07080c;
+  --nav-text: #f8fafc;
+  --nav-active: #e11d48;
+
+  --player-bg: #050609;
+  --player-control-bg: rgba(17, 19, 28, 0.95);
+  --player-control-text: #ffffff;
+  --player-radius: 14px;
+
+  /* 13. Typography & Spacing */
+  --font-family: 'Plus Jakarta Sans', sans-serif;
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.875rem;
+  --font-size-md: 1rem;
+  --font-size-lg: 1.125rem;
+  --font-size-xl: 1.25rem;
+  --font-size-2xl: 1.5rem;
+  --line-height: 1.6;
+
+  --space-xs: 0.25rem;
+  --space-sm: 0.5rem;
+  --space-md: 1rem;
+  --space-lg: 1.5rem;
+  --space-xl: 2rem;
+  --space-2xl: 3rem;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-full: 9999px;
+
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.25);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.45);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.55);
+
+  --transition-fast: 150ms ease;
+  --transition-normal: 250ms ease;
+  --transition-slow: 400ms ease;
+
+  /* Backward compatibility aliases */
+  --primary: var(--color-primary);
+  --secondary: var(--color-secondary);
+  --accent: var(--color-accent);
+  --background: var(--color-background);
+  --surface: var(--color-surface);
+  --foreground: var(--color-text);
+  --muted: var(--color-text-muted);
+  --border: var(--color-border);
+  --button: var(--color-button-background);
+  --button-hover: var(--color-button-hover);
 }
 
 body {
-  font-family: 'Plus Jakarta Sans', sans-serif;
-  background-color: var(--background, #07080e);
-  color: var(--foreground, #f8fafc);
+  font-family: var(--font-family);
+  background-color: var(--color-background);
+  color: var(--color-text);
+  line-height: var(--line-height);
+  transition: background-color var(--transition-normal), color var(--transition-normal);
 }
 
-/* Custom scrollbar */
+/* UI Style Specific Overrides */
+[data-ui-style="glassmorphism"] {
+  --card-backdrop-blur: 16px;
+}
+
+[data-ui-style="glassmorphism"] .glass-panel {
+  background: var(--card-bg) !important;
+  backdrop-filter: blur(var(--card-backdrop-blur, 16px)) !important;
+  -webkit-backdrop-filter: blur(var(--card-backdrop-blur, 16px)) !important;
+  border-color: var(--card-border) !important;
+  box-shadow: var(--card-shadow) !important;
+}
+
+[data-ui-style="neon-gaming"] .neon-glow {
+  box-shadow: 0 0 15px var(--color-primary), 0 0 30px rgba(0, 0, 0, 0.5) !important;
+}
+
+[data-ui-style="neon-gaming"] .neon-border {
+  border-color: var(--color-primary) !important;
+  box-shadow: 0 0 10px rgba(225, 29, 72, 0.3) !important;
+}
+
+[data-ui-style="dark-cinema"] {
+  --card-shadow: 0 14px 35px rgba(0, 0, 0, 0.9);
+}
+
+/* Semantic UI utility classes */
+.theme-card {
+  background-color: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--card-radius);
+  box-shadow: var(--card-shadow);
+  backdrop-filter: blur(var(--card-backdrop-blur, 0px));
+  -webkit-backdrop-filter: blur(var(--card-backdrop-blur, 0px));
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast);
+}
+
+.theme-button-primary {
+  background-color: var(--button-primary-bg);
+  color: var(--button-primary-text);
+  border-radius: var(--button-radius);
+  transition: all var(--transition-fast);
+}
+
+.theme-button-primary:hover:not(:disabled) {
+  background-color: var(--button-primary-hover);
+  transform: translateY(-1px);
+}
+
+.theme-button-secondary {
+  background-color: var(--color-surface-secondary);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: var(--button-radius);
+  transition: all var(--transition-fast);
+}
+
+.theme-button-secondary:hover:not(:disabled) {
+  background-color: var(--color-surface-tertiary);
+  border-color: var(--color-border-strong);
+  color: var(--color-text-inverse);
+}
+
+.theme-input {
+  background-color: var(--input-bg);
+  border: 1px solid var(--input-border);
+  border-radius: var(--input-radius);
+  color: var(--color-text);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.theme-input:focus {
+  outline: none;
+  border-color: var(--input-focus);
+  box-shadow: 0 0 0 2px rgba(225, 29, 72, 0.2);
+}
+
+/* Accessibility: Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Custom scrollbar themed */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 7px;
+  height: 7px;
 }
+
 ::-webkit-scrollbar-track {
-  background: #090a10;
+  background: var(--color-background);
 }
+
 ::-webkit-scrollbar-thumb {
-  background: #1e2235;
+  background: var(--color-surface-tertiary);
   border-radius: 9999px;
+  border: 2px solid var(--color-background);
 }
+
 ::-webkit-scrollbar-thumb:hover {
-  background: #2e3550;
+  background: var(--color-primary);
 }

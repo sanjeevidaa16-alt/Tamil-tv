@@ -1,7 +1,28 @@
 export type UserRole = 'user' | 'manager' | 'admin';
 
-export type VideoStatus = 'published' | 'draft' | 'unlisted' | 'unpublished';
+export type PublishMode = 'publish_now' | 'unlisted' | 'premiere';
+
+export type VideoStatus =
+  | 'published'
+  | 'draft'
+  | 'unlisted'
+  | 'unpublished'
+  | 'scheduled_premiere'
+  | 'premiere_live'
+  | 'premiere_completed'
+  | 'cancelled';
+
 export type VideoVisibility = 'public' | 'private' | 'preview';
+
+export type PremiereState = 'scheduled' | 'live' | 'completed' | 'cancelled' | 'none';
+
+export interface VideoPremiereReminder {
+  id: string;
+  video_id: string;
+  user_id?: string | null;
+  email?: string;
+  created_at: string;
+}
 
 export interface Profile {
   id: string;
@@ -41,6 +62,26 @@ export interface Video {
   views_count: number;
   created_at: string;
   updated_at: string;
+
+  // Publishing & Premiere System Fields
+  publish_mode?: PublishMode;
+  published_at?: string | null;
+  scheduled_at?: string | null;
+  premiere_enabled?: boolean;
+  premiere_at?: string | null; // ISO UTC
+  premiere_timezone?: string; // e.g. 'Asia/Kolkata'
+  premiere_title?: string;
+  premiere_message?: string;
+  premiere_countdown_enabled?: boolean;
+  premiere_countdown_duration?: number; // in minutes (default 2)
+  premiere_reminder_enabled?: boolean;
+  premiere_chat_enabled?: boolean;
+  premiere_show_thumbnail?: boolean;
+  premiere_started_at?: string | null;
+  premiere_completed_at?: string | null;
+  premiere_cancelled_at?: string | null;
+  reminders_count?: number;
+
   // Joined relation fields:
   category?: Category | null;
   uploader?: Profile | null;
@@ -85,6 +126,21 @@ export interface UploadVideoPayload {
   duration?: number;
   uploaderId?: string;
   onProgress?: (percent: number) => void;
+
+  // Publishing Mode & Premiere Options
+  publish_mode?: PublishMode;
+  published_at?: string | null;
+  scheduled_at?: string | null;
+  premiere_enabled?: boolean;
+  premiere_at?: string | null;
+  premiere_timezone?: string;
+  premiere_title?: string;
+  premiere_message?: string;
+  premiere_countdown_enabled?: boolean;
+  premiere_countdown_duration?: number;
+  premiere_reminder_enabled?: boolean;
+  premiere_chat_enabled?: boolean;
+  premiere_show_thumbnail?: boolean;
 }
 
 export interface EditVideoPayload {
@@ -103,6 +159,24 @@ export interface EditVideoPayload {
   visibility?: VideoVisibility;
   tags?: string[];
   duration?: number;
+
+  // Publishing Mode & Premiere Options
+  publish_mode?: PublishMode;
+  published_at?: string | null;
+  scheduled_at?: string | null;
+  premiere_enabled?: boolean;
+  premiere_at?: string | null;
+  premiere_timezone?: string;
+  premiere_title?: string;
+  premiere_message?: string;
+  premiere_countdown_enabled?: boolean;
+  premiere_countdown_duration?: number;
+  premiere_reminder_enabled?: boolean;
+  premiere_chat_enabled?: boolean;
+  premiere_show_thumbnail?: boolean;
+  premiere_started_at?: string | null;
+  premiere_completed_at?: string | null;
+  premiere_cancelled_at?: string | null;
 }
 
 export interface FooterLink {
@@ -131,6 +205,9 @@ export interface FooterSocialLink {
   enabled: boolean;
   sort_order: number;
 }
+
+import { UserPanelDesignId } from './userPanelDesign';
+export type { UserPanelDesignId };
 
 export interface ThemePreset {
   id: string;
@@ -165,17 +242,41 @@ export interface SiteSettings {
 
   // 3. Theme & Colors
   theme_name: string;
+  ui_style?: string;
+  user_panel_design?: UserPanelDesignId;
   appearance_mode: 'dark' | 'light' | 'system';
   primary_color: string;
   secondary_color: string;
   accent_color: string;
   background_color: string;
   surface_color: string;
+  surface_secondary_color?: string;
+  surface_tertiary_color?: string;
+  card_bg_color?: string;
+  card_border_color?: string;
   foreground_color: string;
+  text_color?: string;
   muted_color: string;
   border_color: string;
+  border_strong_color?: string;
+  input_bg_color?: string;
+  input_border_color?: string;
   button_color: string;
   button_hover_color: string;
+  player_bg_color?: string;
+  player_progress_color?: string;
+  success_color?: string;
+  warning_color?: string;
+  error_color?: string;
+  info_color?: string;
+
+  // Custom UI Style Options
+  border_radius_scale?: 'sharp' | 'small' | 'medium' | 'large' | 'pill';
+  card_shadow_strength?: 'none' | 'subtle' | 'medium' | 'strong' | 'glow';
+  spacing_density?: 'compact' | 'comfortable' | 'spacious';
+  font_scale?: 'compact' | 'standard' | 'large';
+  animation_level?: 'none' | 'subtle' | 'normal' | 'enhanced';
+  glass_effect?: boolean;
 
   // 4. Footer Settings
   footer_name: string;
@@ -220,14 +321,7 @@ export interface SiteSettings {
   updated_at?: string;
 }
 
-export interface AnalyticsSettings {
-  id?: string;
-  ga_measurement_id: string;
-  enabled: boolean;
-  track_pageviews: boolean;
-  track_video_events: boolean;
-  updated_at?: string;
-}
+export * from './analytics';
 
 export interface AdSenseSettings {
   id?: string;

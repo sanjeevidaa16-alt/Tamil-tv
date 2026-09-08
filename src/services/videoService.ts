@@ -8,7 +8,11 @@ const LOCAL_STORAGE_VIDEOS_KEY = 'STREAMVAULT_LOCAL_VIDEOS';
 function getLocalVideos(): Video[] {
   const data = localStorage.getItem(LOCAL_STORAGE_VIDEOS_KEY);
   if (!data) {
-    localStorage.setItem(LOCAL_STORAGE_VIDEOS_KEY, JSON.stringify(SEED_VIDEOS));
+    try {
+      localStorage.setItem(LOCAL_STORAGE_VIDEOS_KEY, JSON.stringify(SEED_VIDEOS));
+    } catch {
+      // ignore
+    }
     return SEED_VIDEOS;
   }
   try {
@@ -19,7 +23,17 @@ function getLocalVideos(): Video[] {
 }
 
 function saveLocalVideos(videos: Video[]) {
-  localStorage.setItem(LOCAL_STORAGE_VIDEOS_KEY, JSON.stringify(videos));
+  try {
+    localStorage.setItem(LOCAL_STORAGE_VIDEOS_KEY, JSON.stringify(videos));
+  } catch (err) {
+    console.warn('saveLocalVideos localStorage quota warning:', err);
+  }
+  // Also backup catalog in IndexedDB
+  try {
+    mediaStorage.saveJsonRecord(LOCAL_STORAGE_VIDEOS_KEY, videos);
+  } catch {
+    // ignore
+  }
 }
 
 function isValidUuid(id?: string | null): boolean {
@@ -119,7 +133,10 @@ export const videoService = {
     sortBy?: 'popular' | 'latest' | 'featured';
   }): Promise<{ videos: Video[]; count: number }> {
     if (!isSupabaseConfigured) {
-      let list = [...getLocalVideos()].filter((v) => v.status === 'published' && (v.visibility === 'public' || !v.visibility));
+      const allowedStatuses = ['published', 'scheduled_premiere', 'premiere_live', 'premiere_completed'];
+      let list = [...getLocalVideos()].filter(
+        (v) => allowedStatuses.includes(v.status) && (v.visibility === 'public' || !v.visibility)
+      );
 
       if (params?.categoryId) {
         list = list.filter((v) => v.category_id === params.categoryId);
@@ -157,7 +174,7 @@ export const videoService = {
       let query = supabase
         .from('videos')
         .select('*, category:categories(*), uploader:profiles(*)', { count: 'exact' })
-        .eq('status', 'published');
+        .in('status', ['published', 'scheduled_premiere', 'premiere_live', 'premiere_completed']);
 
       // Filter by public visibility
       query = query.or('visibility.eq.public,visibility.is.null');
@@ -189,7 +206,9 @@ export const videoService = {
         // If table doesn't exist in schema cache, fallback to local and log warning
         console.warn('Supabase videos query note:', error.message);
         if (error.message.includes('schema cache') || error.message.includes('does not exist')) {
-          const fallback = getLocalVideos().filter((v) => v.status === 'published');
+          const fallback = getLocalVideos().filter((v) =>
+            ['published', 'scheduled_premiere', 'premiere_live', 'premiere_completed'].includes(v.status)
+          );
           return { videos: fallback, count: fallback.length };
         }
         throw error;
@@ -198,7 +217,9 @@ export const videoService = {
       return { videos: (data || []) as Video[], count: count || 0 };
     } catch (err: any) {
       console.warn('Fallback to local catalog on error:', err.message || err);
-      const fallback = getLocalVideos().filter((v) => v.status === 'published');
+      const fallback = getLocalVideos().filter((v) =>
+        ['published', 'scheduled_premiere', 'premiere_live', 'premiere_completed'].includes(v.status)
+      );
       return { videos: fallback, count: fallback.length };
     }
   },
@@ -324,23 +345,47 @@ export const videoService = {
       const categoryId = payload.category_id || payload.categoryId;
       const category = SEED_CATEGORIES.find((c) => c.id === categoryId);
 
+      const isPremiere = payload.publish_mode === 'premiere' || payload.status === 'scheduled_premiere';
+      const status = isPremiere
+        ? 'scheduled_premiere'
+        : payload.publish_mode === 'unlisted'
+        ? 'unlisted'
+        : payload.status || 'published';
+
+      const visibility = payload.publish_mode === 'unlisted' ? 'preview' : payload.visibility || 'public';
+
       const newVid: Video = {
         id: 'vid-' + Date.now(),
         title: payload.title.trim(),
         description: payload.description || '',
         thumbnail_url: thumbUri,
         video_path: videoUri,
-        duration: payload.duration || 180,
+        duration: payload.duration || 0,
         category_id: categoryId || null,
         uploaded_by: activeUserId,
-        status: payload.status || 'published',
-        visibility: payload.visibility || 'public',
+        status,
+        visibility,
         is_featured: !!payload.is_featured || !!payload.isFeatured,
         views_count: 0,
         tags: payload.tags || [],
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         category: category || null,
+        // Premiere metadata
+        publish_mode: payload.publish_mode || (isPremiere ? 'premiere' : 'publish_now'),
+        published_at: isPremiere ? null : new Date().toISOString(),
+        scheduled_at: isPremiere ? payload.premiere_at || null : null,
+        premiere_enabled: isPremiere,
+        premiere_at: isPremiere ? payload.premiere_at || null : null,
+        premiere_timezone: payload.premiere_timezone || 'Asia/Kolkata',
+        premiere_title: payload.premiere_title || undefined,
+        premiere_message: payload.premiere_message || undefined,
+        premiere_countdown_enabled: payload.premiere_countdown_enabled ?? true,
+        premiere_countdown_duration: payload.premiere_countdown_duration ?? 2,
+        premiere_reminder_enabled: payload.premiere_reminder_enabled ?? true,
+        premiere_chat_enabled: payload.premiere_chat_enabled ?? true,
+        premiere_show_thumbnail: payload.premiere_show_thumbnail ?? true,
+        reminders_count: 0,
       };
 
       const updated = [newVid, ...localVideos];
@@ -381,23 +426,27 @@ export const videoService = {
 
       // If bucket not found, retry after ensuring bucket
       if (videoUploadError && videoUploadError.message?.toLowerCase().includes('bucket not found')) {
-        await ensureStorageBucket('videos', true);
-        const retry = await supabase.storage
-          .from('videos')
-          .upload(videoStoragePath, payload.videoFile, {
-            cacheControl: '3600',
-            upsert: false,
-          });
-        videoUploadData = retry.data;
-        videoUploadError = retry.error;
+        try {
+          await ensureStorageBucket('videos', true);
+          const retry = await supabase.storage
+            .from('videos')
+            .upload(videoStoragePath, payload.videoFile, {
+              cacheControl: '3600',
+              upsert: false,
+            });
+          videoUploadData = retry.data;
+          videoUploadError = retry.error;
+        } catch {
+          // ignore retry error
+        }
       }
 
       if (videoUploadError) {
-        throw new Error(`Video storage upload failed: ${videoUploadError.message}`);
-      }
-
-      // Generate public streaming URL for the video
-      if (videoUploadData) {
+        console.warn('Supabase storage upload failed, falling back to local media storage:', videoUploadError.message);
+        const localMediaKey = `video_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+        publicVideoUrl = await mediaStorage.saveMediaBlob(localMediaKey, payload.videoFile);
+        videoStoragePath = localMediaKey;
+      } else if (videoUploadData) {
         videoStoragePath = videoUploadData.path;
         const { data: publicUrlData } = supabase.storage.from('videos').getPublicUrl(videoStoragePath);
         publicVideoUrl = publicUrlData.publicUrl;
@@ -418,19 +467,26 @@ export const videoService = {
           });
 
         if (thumbUploadError && thumbUploadError.message?.toLowerCase().includes('bucket not found')) {
-          await ensureStorageBucket('thumbnails', true);
-          const retryThumb = await supabase.storage
-            .from('thumbnails')
-            .upload(thumbStoragePath, payload.thumbnailFile, {
-              cacheControl: '3600',
-              upsert: false,
-            });
-          thumbUploadData = retryThumb.data;
-          thumbUploadError = retryThumb.error;
+          try {
+            await ensureStorageBucket('thumbnails', true);
+            const retryThumb = await supabase.storage
+              .from('thumbnails')
+              .upload(thumbStoragePath, payload.thumbnailFile, {
+                cacheControl: '3600',
+                upsert: false,
+              });
+            thumbUploadData = retryThumb.data;
+            thumbUploadError = retryThumb.error;
+          } catch {
+            // ignore
+          }
         }
 
         if (thumbUploadError) {
-          console.warn('Thumbnail storage upload warning:', thumbUploadError.message);
+          console.warn('Thumbnail storage upload warning, falling back to local storage:', thumbUploadError.message);
+          const localThumbKey = `thumb_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+          publicThumbnailUrl = await mediaStorage.saveMediaBlob(localThumbKey, payload.thumbnailFile);
+          thumbStoragePath = localThumbKey;
         } else if (thumbUploadData) {
           thumbStoragePath = thumbUploadData.path;
           const { data: publicThumbData } = supabase.storage.from('thumbnails').getPublicUrl(thumbStoragePath);
@@ -444,7 +500,16 @@ export const videoService = {
       const categoryId = payload.category_id || payload.categoryId || null;
       const validUploaderId = isValidUuid(activeUserId) ? activeUserId : null;
 
-      const insertPayload = {
+      const isPremiere = payload.publish_mode === 'premiere' || payload.status === 'scheduled_premiere';
+      const status = isPremiere
+        ? 'scheduled_premiere'
+        : payload.publish_mode === 'unlisted'
+        ? 'unlisted'
+        : payload.status || 'published';
+
+      const visibility = payload.publish_mode === 'unlisted' ? 'preview' : payload.visibility || 'public';
+
+      const insertPayload: any = {
         title: payload.title.trim(),
         description: payload.description || '',
         video_path: publicVideoUrl,
@@ -452,19 +517,34 @@ export const videoService = {
         storage_path: videoStoragePath,
         thumbnail_url: publicThumbnailUrl || null,
         thumbnail_path: thumbStoragePath || null,
-        duration: payload.duration || 180,
-        duration_seconds: payload.duration || 180,
+        duration: payload.duration || 0,
+        duration_seconds: payload.duration || 0,
         category_id: isValidUuid(categoryId) ? categoryId : null,
         uploaded_by: validUploaderId,
         uploader_id: validUploaderId,
-        status: payload.status || 'published',
-        visibility: payload.visibility || 'public',
+        status,
+        visibility,
         is_featured: !!payload.is_featured || !!payload.isFeatured,
         views_count: 0,
         views: 0,
         file_size: payload.videoFile.size,
         mime_type: payload.videoFile.type || 'video/mp4',
         tags: payload.tags || [],
+        // Premiere & Publishing columns
+        publish_mode: payload.publish_mode || (isPremiere ? 'premiere' : 'publish_now'),
+        published_at: isPremiere ? null : new Date().toISOString(),
+        scheduled_at: isPremiere ? payload.premiere_at || null : null,
+        premiere_enabled: isPremiere,
+        premiere_at: isPremiere ? payload.premiere_at || null : null,
+        premiere_timezone: payload.premiere_timezone || 'Asia/Kolkata',
+        premiere_title: payload.premiere_title || null,
+        premiere_message: payload.premiere_message || null,
+        premiere_countdown_enabled: payload.premiere_countdown_enabled ?? true,
+        premiere_countdown_duration: payload.premiere_countdown_duration ?? 2,
+        premiere_reminder_enabled: payload.premiere_reminder_enabled ?? true,
+        premiere_chat_enabled: payload.premiere_chat_enabled ?? true,
+        premiere_show_thumbnail: payload.premiere_show_thumbnail ?? true,
+        reminders_count: 0,
       };
 
       const { data: newVideoRecord, error: insertError } = await supabase
@@ -475,30 +555,79 @@ export const videoService = {
 
       // STEP 7 & 11: Confirm database insert succeeded. If it failed, ROLLBACK storage!
       if (insertError) {
-        console.error('Database insert error:', insertError);
-
-        // Rollback / cleanup storage objects to avoid orphans
-        if (videoStoragePath) {
-          await supabase.storage.from('videos').remove([videoStoragePath]).catch(console.warn);
-        }
-        if (thumbStoragePath) {
-          await supabase.storage.from('thumbnails').remove([thumbStoragePath]).catch(console.warn);
-        }
-
         const isSchemaMissing =
+          insertError.code === 'PGRST205' ||
           insertError.message.includes('schema cache') ||
           insertError.message.includes('does not exist') ||
           insertError.message.includes('relation');
 
-        if (isSchemaMissing) {
+        if (!isSchemaMissing) {
+          console.error('Database insert error:', insertError);
+
+          // Rollback / cleanup storage objects to avoid orphans
+          if (videoStoragePath && !videoStoragePath.startsWith('idb:') && !videoStoragePath.startsWith('blob:')) {
+            await supabase.storage.from('videos').remove([videoStoragePath]).catch(console.warn);
+          }
+          if (thumbStoragePath && !thumbStoragePath.startsWith('idb:') && !thumbStoragePath.startsWith('blob:')) {
+            await supabase.storage.from('thumbnails').remove([thumbStoragePath]).catch(console.warn);
+          }
+
           throw new Error(
-            `Video upload failed: Could not find the table 'public.videos' in Supabase database. Please go to Admin Panel > Database Setup and execute the database migration script.`
+            `Video upload failed because video metadata could not be saved to database: ${insertError.message}`
           );
         }
 
-        throw new Error(
-          `Video upload failed because video metadata could not be saved to database: ${insertError.message}`
-        );
+        console.warn('Supabase table missing (PGRST205 / schema cache), falling back to local catalog save.');
+        const localVideos = getLocalVideos();
+        const categoryId = payload.category_id || payload.categoryId;
+        const category = SEED_CATEGORIES.find((c) => c.id === categoryId);
+
+        const isPremiere = payload.publish_mode === 'premiere' || payload.status === 'scheduled_premiere';
+        const status = isPremiere
+          ? 'scheduled_premiere'
+          : payload.publish_mode === 'unlisted'
+          ? 'unlisted'
+          : payload.status || 'published';
+
+        const visibility = payload.publish_mode === 'unlisted' ? 'preview' : payload.visibility || 'public';
+
+        const newVid: Video = {
+          id: 'vid-' + Date.now(),
+          title: payload.title.trim(),
+          description: payload.description || '',
+          thumbnail_url: publicThumbnailUrl || 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=1280&h=720&fit=crop',
+          video_path: publicVideoUrl,
+          duration: payload.duration || 0,
+          category_id: categoryId || null,
+          uploaded_by: activeUserId,
+          status,
+          visibility,
+          is_featured: !!payload.is_featured || !!payload.isFeatured,
+          views_count: 0,
+          tags: payload.tags || [],
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          category: category || null,
+          publish_mode: payload.publish_mode || (isPremiere ? 'premiere' : 'publish_now'),
+          published_at: isPremiere ? null : new Date().toISOString(),
+          scheduled_at: isPremiere ? payload.premiere_at || null : null,
+          premiere_enabled: isPremiere,
+          premiere_at: isPremiere ? payload.premiere_at || null : null,
+          premiere_timezone: payload.premiere_timezone || 'Asia/Kolkata',
+          premiere_title: payload.premiere_title || undefined,
+          premiere_message: payload.premiere_message || undefined,
+          premiere_countdown_enabled: payload.premiere_countdown_enabled ?? true,
+          premiere_countdown_duration: payload.premiere_countdown_duration ?? 2,
+          premiere_reminder_enabled: payload.premiere_reminder_enabled ?? true,
+          premiere_chat_enabled: payload.premiere_chat_enabled ?? true,
+          premiere_show_thumbnail: payload.premiere_show_thumbnail ?? true,
+          reminders_count: 0,
+        };
+
+        const updatedList = [newVid, ...localVideos];
+        saveLocalVideos(updatedList);
+        progressCallback?.(100);
+        return newVid;
       }
 
       progressCallback?.(100);
@@ -543,6 +672,8 @@ export const videoService = {
       const catId = payload.category_id || payload.categoryId;
       const category = SEED_CATEGORIES.find((c) => c.id === catId);
 
+      const isPremiere = payload.publish_mode === 'premiere' || payload.status === 'scheduled_premiere';
+
       const updated: Video = {
         ...videos[index],
         title: (payload.title || videos[index].title).trim(),
@@ -551,10 +682,26 @@ export const videoService = {
         video_path: videoPath,
         category_id: catId || videos[index].category_id,
         is_featured: payload.is_featured !== undefined ? payload.is_featured : videos[index].is_featured,
-        status: payload.status || videos[index].status,
-        visibility: payload.visibility || videos[index].visibility,
+        status: payload.status || (payload.publish_mode === 'unlisted' ? 'unlisted' : isPremiere ? 'scheduled_premiere' : videos[index].status),
+        visibility: payload.visibility || (payload.publish_mode === 'unlisted' ? 'preview' : videos[index].visibility),
         updated_at: new Date().toISOString(),
         category: category || videos[index].category,
+        publish_mode: payload.publish_mode !== undefined ? payload.publish_mode : videos[index].publish_mode,
+        published_at: payload.published_at !== undefined ? payload.published_at : videos[index].published_at,
+        scheduled_at: payload.scheduled_at !== undefined ? payload.scheduled_at : videos[index].scheduled_at,
+        premiere_enabled: payload.premiere_enabled !== undefined ? payload.premiere_enabled : isPremiere ? true : videos[index].premiere_enabled,
+        premiere_at: payload.premiere_at !== undefined ? payload.premiere_at : videos[index].premiere_at,
+        premiere_timezone: payload.premiere_timezone !== undefined ? payload.premiere_timezone : videos[index].premiere_timezone,
+        premiere_title: payload.premiere_title !== undefined ? payload.premiere_title : videos[index].premiere_title,
+        premiere_message: payload.premiere_message !== undefined ? payload.premiere_message : videos[index].premiere_message,
+        premiere_countdown_enabled: payload.premiere_countdown_enabled !== undefined ? payload.premiere_countdown_enabled : videos[index].premiere_countdown_enabled,
+        premiere_countdown_duration: payload.premiere_countdown_duration !== undefined ? payload.premiere_countdown_duration : videos[index].premiere_countdown_duration,
+        premiere_reminder_enabled: payload.premiere_reminder_enabled !== undefined ? payload.premiere_reminder_enabled : videos[index].premiere_reminder_enabled,
+        premiere_chat_enabled: payload.premiere_chat_enabled !== undefined ? payload.premiere_chat_enabled : videos[index].premiere_chat_enabled,
+        premiere_show_thumbnail: payload.premiere_show_thumbnail !== undefined ? payload.premiere_show_thumbnail : videos[index].premiere_show_thumbnail,
+        premiere_started_at: payload.premiere_started_at !== undefined ? payload.premiere_started_at : videos[index].premiere_started_at,
+        premiere_completed_at: payload.premiere_completed_at !== undefined ? payload.premiere_completed_at : videos[index].premiere_completed_at,
+        premiere_cancelled_at: payload.premiere_cancelled_at !== undefined ? payload.premiere_cancelled_at : videos[index].premiere_cancelled_at,
       };
 
       videos[index] = updated;
@@ -615,6 +762,24 @@ export const videoService = {
     if (payload.status !== undefined) updateFields.status = payload.status;
     if (payload.visibility !== undefined) updateFields.visibility = payload.visibility;
     if (payload.tags !== undefined) updateFields.tags = payload.tags;
+
+    // Premiere metadata updates
+    if (payload.publish_mode !== undefined) updateFields.publish_mode = payload.publish_mode;
+    if (payload.published_at !== undefined) updateFields.published_at = payload.published_at;
+    if (payload.scheduled_at !== undefined) updateFields.scheduled_at = payload.scheduled_at;
+    if (payload.premiere_enabled !== undefined) updateFields.premiere_enabled = payload.premiere_enabled;
+    if (payload.premiere_at !== undefined) updateFields.premiere_at = payload.premiere_at;
+    if (payload.premiere_timezone !== undefined) updateFields.premiere_timezone = payload.premiere_timezone;
+    if (payload.premiere_title !== undefined) updateFields.premiere_title = payload.premiere_title;
+    if (payload.premiere_message !== undefined) updateFields.premiere_message = payload.premiere_message;
+    if (payload.premiere_countdown_enabled !== undefined) updateFields.premiere_countdown_enabled = payload.premiere_countdown_enabled;
+    if (payload.premiere_countdown_duration !== undefined) updateFields.premiere_countdown_duration = payload.premiere_countdown_duration;
+    if (payload.premiere_reminder_enabled !== undefined) updateFields.premiere_reminder_enabled = payload.premiere_reminder_enabled;
+    if (payload.premiere_chat_enabled !== undefined) updateFields.premiere_chat_enabled = payload.premiere_chat_enabled;
+    if (payload.premiere_show_thumbnail !== undefined) updateFields.premiere_show_thumbnail = payload.premiere_show_thumbnail;
+    if (payload.premiere_started_at !== undefined) updateFields.premiere_started_at = payload.premiere_started_at;
+    if (payload.premiere_completed_at !== undefined) updateFields.premiere_completed_at = payload.premiere_completed_at;
+    if (payload.premiere_cancelled_at !== undefined) updateFields.premiere_cancelled_at = payload.premiere_cancelled_at;
 
     if (finalThumbnailUrl) {
       updateFields.thumbnail_url = finalThumbnailUrl;
@@ -883,5 +1048,222 @@ export const videoService = {
     } catch (err) {
       console.warn('View record non-blocking note:', err);
     }
+  },
+
+  /**
+   * Fetch all premiere videos (scheduled, live, completed, cancelled)
+   */
+  async getPremieres(): Promise<Video[]> {
+    if (!isSupabaseConfigured) {
+      return getLocalVideos().filter(
+        (v) =>
+          v.premiere_enabled ||
+          ['scheduled_premiere', 'premiere_live', 'premiere_completed', 'cancelled'].includes(v.status)
+      );
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('videos')
+        .select('*, category:categories(*), uploader:profiles(*)')
+        .or('premiere_enabled.eq.true,status.in.(scheduled_premiere,premiere_live,premiere_completed,cancelled)')
+        .order('premiere_at', { ascending: true, nullsFirst: false });
+
+      if (error) {
+        return getLocalVideos().filter(
+          (v) =>
+            v.premiere_enabled ||
+            ['scheduled_premiere', 'premiere_live', 'premiere_completed', 'cancelled'].includes(v.status)
+        );
+      }
+      return (data || []) as Video[];
+    } catch {
+      return getLocalVideos().filter(
+        (v) =>
+          v.premiere_enabled ||
+          ['scheduled_premiere', 'premiere_live', 'premiere_completed', 'cancelled'].includes(v.status)
+      );
+    }
+  },
+
+  /**
+   * Reschedule a premiere to a new date/time and timezone
+   */
+  async reschedulePremiere(videoId: string, newPremiereAt: string, timezone = 'Asia/Kolkata'): Promise<Video> {
+    return this.updateVideo(videoId, {
+      premiere_at: newPremiereAt,
+      scheduled_at: newPremiereAt,
+      premiere_timezone: timezone,
+      status: 'scheduled_premiere',
+      premiere_enabled: true,
+      premiere_started_at: null,
+      premiere_completed_at: null,
+      premiere_cancelled_at: null,
+    });
+  },
+
+  /**
+   * Cancel an upcoming premiere
+   */
+  async cancelPremiere(videoId: string, targetStatus: 'cancelled' | 'draft' = 'cancelled'): Promise<Video> {
+    return this.updateVideo(videoId, {
+      status: targetStatus,
+      premiere_cancelled_at: new Date().toISOString(),
+    });
+  },
+
+  /**
+   * Manually start a premiere now (go live immediately)
+   */
+  async startPremiereNow(videoId: string): Promise<Video> {
+    const nowIso = new Date().toISOString();
+    return this.updateVideo(videoId, {
+      status: 'premiere_live',
+      premiere_at: nowIso,
+      premiere_started_at: nowIso,
+    });
+  },
+
+  /**
+   * Mark premiere as completed (transition to on-demand catalog)
+   */
+  async completePremiere(videoId: string): Promise<Video> {
+    const nowIso = new Date().toISOString();
+    return this.updateVideo(videoId, {
+      status: 'premiere_completed',
+      premiere_completed_at: nowIso,
+      published_at: nowIso,
+    });
+  },
+
+  /**
+   * Check if the current user has set a reminder for this premiere
+   */
+  async hasUserSetReminder(videoId: string, userId?: string): Promise<boolean> {
+    if (!userId) {
+      const stored = localStorage.getItem(`PREMIERE_REMINDER_${videoId}`);
+      return stored === 'true';
+    }
+
+    if (!isSupabaseConfigured || !isValidUuid(videoId) || !isValidUuid(userId)) {
+      const stored = localStorage.getItem(`PREMIERE_REMINDER_${videoId}_${userId}`);
+      return stored === 'true';
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('video_premiere_reminders')
+        .select('id')
+        .eq('video_id', videoId)
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (!error && data) return true;
+      return false;
+    } catch {
+      return localStorage.getItem(`PREMIERE_REMINDER_${videoId}_${userId}`) === 'true';
+    }
+  },
+
+  /**
+   * Toggle premiere reminder subscription
+   */
+  async togglePremiereReminder(
+    videoId: string,
+    userId?: string,
+    email?: string
+  ): Promise<{ hasReminder: boolean; newCount: number }> {
+    const currentlySet = await this.hasUserSetReminder(videoId, userId);
+    const shouldAdd = !currentlySet;
+
+    // Handle local storage flag
+    const localKey = userId ? `PREMIERE_REMINDER_${videoId}_${userId}` : `PREMIERE_REMINDER_${videoId}`;
+    if (shouldAdd) {
+      localStorage.setItem(localKey, 'true');
+    } else {
+      localStorage.removeItem(localKey);
+    }
+
+    let updatedCount = 0;
+
+    if (isSupabaseConfigured && isValidUuid(videoId)) {
+      try {
+        if (shouldAdd) {
+          await supabase.from('video_premiere_reminders').upsert([
+            {
+              video_id: videoId,
+              user_id: isValidUuid(userId) ? userId : null,
+              email: email || null,
+            },
+          ]);
+        } else if (isValidUuid(userId)) {
+          await supabase
+            .from('video_premiere_reminders')
+            .delete()
+            .eq('video_id', videoId)
+            .eq('user_id', userId);
+        }
+
+        // Update video reminders_count
+        const { count } = await supabase
+          .from('video_premiere_reminders')
+          .select('id', { count: 'exact', head: true })
+          .eq('video_id', videoId);
+
+        updatedCount = count || 0;
+        await supabase.from('videos').update({ reminders_count: updatedCount }).eq('id', videoId);
+      } catch (err) {
+        console.warn('Reminder update note:', err);
+      }
+    } else {
+      // Local fallback count adjustment
+      const videos = getLocalVideos();
+      const vid = videos.find((v) => v.id === videoId);
+      if (vid) {
+        vid.reminders_count = Math.max(0, (vid.reminders_count || 0) + (shouldAdd ? 1 : -1));
+        updatedCount = vid.reminders_count;
+        saveLocalVideos(videos);
+      }
+    }
+
+    return { hasReminder: shouldAdd, newCount: updatedCount };
+  },
+
+  /**
+   * Auto-evaluates premiere lifecycle and transitions state if time reached
+   */
+  async checkAndUpdatePremiereStatus(video: Video): Promise<Video> {
+    if (!video.premiere_at || video.status === 'cancelled' || video.status === 'published') {
+      return video;
+    }
+
+    const now = Date.now();
+    const premiereTime = new Date(video.premiere_at).getTime();
+    const durationSeconds = video.duration || 180;
+    const durationMs = durationSeconds * 1000;
+
+    // Has premiere finished?
+    if (now >= premiereTime + durationMs && video.status !== 'premiere_completed') {
+      try {
+        return await this.completePremiere(video.id);
+      } catch {
+        return { ...video, status: 'premiere_completed' };
+      }
+    }
+
+    // Has premiere gone live?
+    if (now >= premiereTime && now < premiereTime + durationMs && video.status === 'scheduled_premiere') {
+      try {
+        const nowIso = new Date().toISOString();
+        return await this.updateVideo(video.id, {
+          status: 'premiere_live',
+          premiere_started_at: nowIso,
+        });
+      } catch {
+        return { ...video, status: 'premiere_live' };
+      }
+    }
+
+    return video;
   },
 };

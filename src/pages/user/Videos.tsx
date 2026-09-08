@@ -5,10 +5,12 @@ import { videoService } from '../../services/videoService';
 import { categoryService } from '../../services/categoryService';
 import { filterService } from '../../services/filterService';
 import { VideoCard } from '../../components/video/VideoCard';
+import { useUserPanelDesign } from '../../contexts/UserPanelDesignContext';
 import { AdPlacementSlot } from '../../components/ads/AdPlacementSlot';
 import { AdsterraSlot } from '../../components/ads/AdsterraSlot';
 import { useAdSense } from '../../contexts/AdSenseContext';
 import { useAdsterra } from '../../contexts/AdsterraContext';
+import { useAnalytics } from '../../contexts/AnalyticsContext';
 
 interface VideosProps {
   navigate: (path: string) => void;
@@ -23,6 +25,8 @@ export const Videos: React.FC<VideosProps> = ({
 }) => {
   const { getPlacement } = useAdSense();
   const { getPlacement: getAdsterraPlacement, isAdsterraActive } = useAdsterra();
+  const { activeDesign } = useUserPanelDesign();
+  const { trackSearch, trackFilter, trackCategoryView } = useAnalytics();
   const [videos, setVideos] = useState<Video[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [filters, setFilters] = useState<VideoFilter[]>([]);
@@ -37,9 +41,12 @@ export const Videos: React.FC<VideosProps> = ({
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(search);
-    }, 300);
+      if (search.trim()) {
+        trackSearch(search.trim(), videos.length);
+      }
+    }, 350);
     return () => clearTimeout(timer);
-  }, [search]);
+  }, [search, trackSearch, videos.length]);
 
   // Load dynamic filters & categories from database
   useEffect(() => {
@@ -83,6 +90,9 @@ export const Videos: React.FC<VideosProps> = ({
 
   // Handle dynamic filter option toggle
   const handleSelectFilterOption = (filterSlug: string, optionValue: string) => {
+    if (optionValue) {
+      trackFilter(filterSlug, optionValue);
+    }
     setSelectedFilterValues((prev) => {
       const next = { ...prev };
       if (next[filterSlug] === optionValue || !optionValue) {
@@ -142,6 +152,19 @@ export const Videos: React.FC<VideosProps> = ({
 
   const adsterraInFeed = getAdsterraPlacement('between_video_cards');
   const adsterraInFeedFrequency = adsterraInFeed?.frequency || 5;
+
+  const getGridClass = () => {
+    if (activeDesign.layout.mode === 'dense-grid') {
+      return 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3';
+    }
+    if (activeDesign.layout.mode === 'cinema-theatre') {
+      return 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6';
+    }
+    if (activeDesign.layout.spacingDensity === 'compact') {
+      return 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3.5';
+    }
+    return 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5 sm:gap-6';
+  };
 
   return (
     <div id="videos-catalog-page" className="space-y-6 pb-16">
@@ -267,7 +290,7 @@ export const Videos: React.FC<VideosProps> = ({
           {/* Adsterra: Videos Page Center */}
           <AdsterraSlot placementKey="videos_center" />
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          <div className={getGridClass()}>
             {filteredVideos.map((video, index) => {
               const shouldShowInFeedAd =
                 inFeedPlacement?.enabled &&

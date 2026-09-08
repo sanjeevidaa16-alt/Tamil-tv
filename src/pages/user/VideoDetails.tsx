@@ -9,6 +9,7 @@ import {
   Film,
   CheckCircle2,
   Lock,
+  Play,
 } from 'lucide-react';
 import { Video } from '../../types';
 import { videoService } from '../../services/videoService';
@@ -17,6 +18,7 @@ import { VideoCard } from '../../components/video/VideoCard';
 import { formatDuration, formatViews, formatTimeAgo } from '../../utils/formatters';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../components/common/Toast';
+import { useAnalytics } from '../../contexts/AnalyticsContext';
 import { AdPlacementSlot } from '../../components/ads/AdPlacementSlot';
 import { AdsterraSlot } from '../../components/ads/AdsterraSlot';
 
@@ -26,8 +28,9 @@ interface VideoDetailsProps {
 }
 
 export const VideoDetails: React.FC<VideoDetailsProps> = ({ id, navigate }) => {
-  const { user } = useAuth();
+  const { user, isAdmin, isManager } = useAuth();
   const { showToast } = useToast();
+  const { trackVideoOpen, trackClick } = useAnalytics();
 
   const [video, setVideo] = useState<Video | null>(null);
   const [relatedVideos, setRelatedVideos] = useState<Video[]>([]);
@@ -50,6 +53,16 @@ export const VideoDetails: React.FC<VideoDetailsProps> = ({ id, navigate }) => {
         }
 
         setVideo(found);
+
+        // Record video open in GA4
+        trackVideoOpen({
+          video_id: found.id,
+          video_title: found.title,
+          video_category: found.category?.name,
+          video_duration: found.duration,
+          category_slug: found.category?.slug,
+          is_featured: found.is_featured,
+        });
 
         // Record video view safely (handles duplicate prevention internally)
         videoService.recordView(found.id, user?.id);
@@ -77,12 +90,16 @@ export const VideoDetails: React.FC<VideoDetailsProps> = ({ id, navigate }) => {
     return () => {
       mounted = false;
     };
-  }, [id, user?.id]);
+  }, [id, user?.id, trackVideoOpen]);
 
   const handleShare = () => {
     if (navigator.clipboard) {
       navigator.clipboard.writeText(window.location.href);
       setCopied(true);
+      trackClick('share_click', {
+        video_id: video?.id,
+        video_title: video?.title,
+      });
       showToast('Video link copied to clipboard!', 'success');
       setTimeout(() => setCopied(false), 2500);
     }
@@ -146,13 +163,40 @@ export const VideoDetails: React.FC<VideoDetailsProps> = ({ id, navigate }) => {
       <AdsterraSlot placementKey="video_before_player" />
 
       {/* Primary Video Player Stage (Strictly NO autoplay with sound) */}
-      <section id="main-player-stage">
-        <VideoPlayer
-          src={video.video_path}
-          poster={video.thumbnail_url}
-          title={video.title}
-          autoPlay={false}
-        />
+      <section id="main-player-stage" className="relative">
+        {(!user && !isAdmin && !isManager) ? (
+          <div
+            onClick={() => {
+              const targetUrl = `/videos/${video.id}`;
+              sessionStorage.setItem('STREAMVAULT_REDIRECT_URL', targetUrl);
+              navigate(`/login?redirect=${encodeURIComponent(targetUrl)}`);
+            }}
+            className="aspect-video w-full rounded-3xl bg-[#11131c] border border-slate-800 flex flex-col items-center justify-center p-8 text-center relative overflow-hidden shadow-2xl cursor-pointer group"
+          >
+            <div className="absolute inset-0 bg-cover bg-center opacity-30 group-hover:scale-105 transition-transform duration-700" style={{ backgroundImage: `url(${video.thumbnail_url})` }} />
+            <div className="absolute inset-0 bg-black/50 group-hover:bg-black/40 transition-colors" />
+            <div className="relative z-10 w-20 h-20 rounded-full bg-rose-600 text-white flex items-center justify-center shadow-2xl group-hover:scale-110 transition-transform">
+              <Play className="w-8 h-8 ml-1 fill-white" />
+            </div>
+            <div className="relative z-10 mt-4 space-y-1">
+              <h3 className="text-lg font-black text-white">{video.title}</h3>
+              <p className="text-xs text-rose-400 font-semibold">Click to Sign In & Play Video</p>
+            </div>
+          </div>
+        ) : (
+          <VideoPlayer
+            src={video.video_path}
+            poster={video.thumbnail_url}
+            title={video.title}
+            videoId={video.id}
+            category={video.category?.name}
+            channelName={video.channel?.name || video.channel_name}
+            showName={video.show_name}
+            episodeName={video.episode_name}
+            language={video.language}
+            autoPlay={false}
+          />
+        )}
       </section>
 
       {/* Ad: Below Video Player */}

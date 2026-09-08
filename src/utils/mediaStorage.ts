@@ -151,4 +151,54 @@ export const mediaStorage = {
       console.warn('Error deleting media from IndexedDB:', err);
     }
   },
+
+  /**
+   * Save a JSON record into IndexedDB (not bound by localStorage 5MB quota)
+   */
+  async saveJsonRecord(key: string, data: any): Promise<void> {
+    try {
+      const cleanKey = key.replace(/^idb:/, '');
+      const db = await openDatabase();
+      await new Promise<void>((resolve, reject) => {
+        const transaction = db.transaction([STORE_NAME], 'readwrite');
+        const store = transaction.objectStore(STORE_NAME);
+        const record = {
+          key: cleanKey,
+          data,
+          updatedAt: Date.now(),
+        };
+        const req = store.put(record);
+        req.onsuccess = () => resolve();
+        req.onerror = () => reject(req.error);
+      });
+    } catch (err) {
+      console.warn('IndexedDB saveJsonRecord warning:', err);
+    }
+  },
+
+  /**
+   * Retrieve a JSON record from IndexedDB
+   */
+  async getJsonRecord<T>(key: string): Promise<T | null> {
+    try {
+      const cleanKey = key.replace(/^idb:/, '');
+      const db = await openDatabase();
+      return new Promise<T | null>((resolve, reject) => {
+        const transaction = db.transaction([STORE_NAME], 'readonly');
+        const store = transaction.objectStore(STORE_NAME);
+        const req = store.get(cleanKey);
+        req.onsuccess = () => {
+          if (req.result && req.result.data !== undefined) {
+            resolve(req.result.data as T);
+          } else {
+            resolve(null);
+          }
+        };
+        req.onerror = () => reject(req.error);
+      });
+    } catch (err) {
+      console.warn('IndexedDB getJsonRecord warning:', err);
+      return null;
+    }
+  },
 };

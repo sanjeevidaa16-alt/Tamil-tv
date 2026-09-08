@@ -10,6 +10,32 @@ export function formatDuration(seconds: number): string {
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
+export function getVideoFileDuration(file: File): Promise<number> {
+  return new Promise((resolve) => {
+    try {
+      const video = document.createElement('video');
+      video.preload = 'metadata';
+      const url = URL.createObjectURL(file);
+      video.src = url;
+      video.onloadedmetadata = () => {
+        URL.revokeObjectURL(url);
+        const duration = Math.round(video.duration || 0);
+        resolve(duration > 0 ? duration : 0);
+      };
+      video.onerror = () => {
+        URL.revokeObjectURL(url);
+        resolve(0);
+      };
+      setTimeout(() => {
+        URL.revokeObjectURL(url);
+        resolve(0);
+      }, 4000);
+    } catch {
+      resolve(0);
+    }
+  });
+}
+
 export function formatViews(views: number): string {
   if (!views || views === 0) return '0 views';
   if (views >= 1_000_000) {

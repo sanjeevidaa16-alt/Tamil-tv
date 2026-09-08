@@ -1,6 +1,9 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { SiteSettings, AnalyticsSettings, AdSenseSettings, AdminActivityLog } from '../types';
 import { DEFAULT_SITE_SETTINGS_CONFIG } from '../data/themes';
+import { analyticsService, DEFAULT_ANALYTICS_SETTINGS } from './analyticsService';
+import { mediaStorage } from '../utils/mediaStorage';
+import { optimizeImageFile, compressBase64Image } from '../utils/imageOptimizer';
 
 const LOCAL_SITE_SETTINGS_KEY = 'STREAMVAULT_SITE_SETTINGS';
 const LOCAL_ANALYTICS_SETTINGS_KEY = 'STREAMVAULT_ANALYTICS_SETTINGS';
@@ -9,13 +12,6 @@ const LOCAL_ACTIVITY_LOGS_KEY = 'STREAMVAULT_ACTIVITY_LOGS';
 
 const DEFAULT_SITE_SETTINGS: SiteSettings = {
   ...DEFAULT_SITE_SETTINGS_CONFIG,
-};
-
-const DEFAULT_ANALYTICS_SETTINGS: AnalyticsSettings = {
-  ga_measurement_id: '',
-  enabled: false,
-  track_pageviews: true,
-  track_video_events: true,
 };
 
 const DEFAULT_ADSENSE_SETTINGS: AdSenseSettings = {
@@ -53,18 +49,124 @@ const sanitizeSettings = (settings: SiteSettings): SiteSettings => {
   return sanitized;
 };
 
+const BRAND_IMAGE_FIELDS: (keyof SiteSettings)[] = [
+  'main_logo_url',
+  'header_logo_url',
+  'footer_logo_url',
+  'mobile_logo_url',
+  'favicon_url',
+];
+
+/**
+ * Ensures any large data:image URLs are downscaled so settings stay compact
+ */
+async function compressSettingsImages(settings: SiteSettings): Promise<SiteSettings> {
+  const result: Record<string, any> = { ...settings };
+  for (const field of BRAND_IMAGE_FIELDS) {
+    const val = result[field];
+    if (typeof val === 'string' && val.startsWith('data:image/') && val.length > 60000) {
+      const isFavicon = field === 'favicon_url';
+      try {
+        result[field] = await compressBase64Image(
+          val,
+          isFavicon ? 128 : 600,
+          isFavicon ? 128 : 200,
+          0.85
+        );
+      } catch {
+        // Keep existing if compression fails
+      }
+    }
+  }
+  return result as SiteSettings;
+}
+
+/**
+ * Dual-layer persistent storage (IndexedDB + localStorage) with quota recovery
+ */
+async function safeSaveSiteSettings(settings: SiteSettings): Promise<SiteSettings> {
+  // 1. Optimize any oversized image URLs
+  const optimized = await compressSettingsImages(settings);
+
+  // 2. Persist full settings in IndexedDB (virtually unlimited quota)
+  try {
+    await mediaStorage.saveJsonRecord(LOCAL_SITE_SETTINGS_KEY, optimized);
+  } catch (idbErr) {
+    console.warn('Could not persist settings to IndexedDB:', idbErr);
+  }
+
+  // 3. Persist to localStorage with active quota recovery
+  const serialized = JSON.stringify(optimized);
+  try {
+    localStorage.setItem(LOCAL_SITE_SETTINGS_KEY, serialized);
+  } catch (quotaErr: any) {
+    console.warn('localStorage quota exceeded on saving site settings. Running recovery...', quotaErr);
+
+    try {
+      // Step A: Evict or clear non-critical activity logs from localStorage
+      localStorage.removeItem(LOCAL_ACTIVITY_LOGS_KEY);
+      localStorage.setItem(LOCAL_SITE_SETTINGS_KEY, serialized);
+      console.info('Successfully saved site settings after clearing temporary activity logs.');
+    } catch {
+      // Step B: If still failing, create an ultra-lightweight copy for localStorage
+      // while IndexedDB keeps the full settings with all images intact
+      try {
+        const lightweightCopy: Record<string, any> = { ...optimized };
+        for (const field of BRAND_IMAGE_FIELDS) {
+          const val = lightweightCopy[field];
+          if (typeof val === 'string' && val.startsWith('data:')) {
+            // Remove heavy data URL from localStorage only; IndexedDB retains it
+            lightweightCopy[field] = '';
+          }
+        }
+        localStorage.setItem(LOCAL_SITE_SETTINGS_KEY, JSON.stringify(lightweightCopy));
+        console.info('Saved lightweight settings to localStorage (full settings safe in IndexedDB).');
+      } catch (finalErr) {
+        console.warn('localStorage write skipped (settings safely preserved in IndexedDB):', finalErr);
+      }
+    }
+  }
+
+  return optimized;
+}
+
 export const settingsService = {
   // Site Settings
   async getSiteSettings(): Promise<SiteSettings> {
+    // 1. Check IndexedDB first (most complete and free of localStorage 5MB quota restrictions)
+    let idbSettings: SiteSettings | null = null;
+    try {
+      idbSettings = await mediaStorage.getJsonRecord<SiteSettings>(LOCAL_SITE_SETTINGS_KEY);
+    } catch {
+      idbSettings = null;
+    }
+
     const fallback = (): SiteSettings => {
-      const cached = localStorage.getItem(LOCAL_SITE_SETTINGS_KEY);
-      if (cached) {
-        try {
-          return sanitizeSettings({ ...DEFAULT_SITE_SETTINGS, ...JSON.parse(cached) });
-        } catch {
-          return DEFAULT_SITE_SETTINGS;
+      let localSettings: SiteSettings | null = null;
+      try {
+        const cached = localStorage.getItem(LOCAL_SITE_SETTINGS_KEY);
+        if (cached) {
+          localSettings = JSON.parse(cached);
         }
+      } catch {
+        localSettings = null;
       }
+
+      if (idbSettings && localSettings) {
+        const idbTime = new Date(idbSettings.updated_at || 0).getTime();
+        const localTime = new Date(localSettings.updated_at || 0).getTime();
+        const preferred = idbTime >= localTime ? idbSettings : localSettings;
+        return sanitizeSettings({ ...DEFAULT_SITE_SETTINGS, ...preferred });
+      }
+
+      if (idbSettings) {
+        return sanitizeSettings({ ...DEFAULT_SITE_SETTINGS, ...idbSettings });
+      }
+
+      if (localSettings) {
+        return sanitizeSettings({ ...DEFAULT_SITE_SETTINGS, ...localSettings });
+      }
+
       return DEFAULT_SITE_SETTINGS;
     };
 
@@ -83,7 +185,10 @@ export const settingsService = {
       if (error || !data) {
         return fallback();
       }
-      return sanitizeSettings({ ...DEFAULT_SITE_SETTINGS, ...data } as SiteSettings);
+      const sanitized = sanitizeSettings({ ...DEFAULT_SITE_SETTINGS, ...data } as SiteSettings);
+      // Cache Supabase response in IndexedDB & localStorage
+      safeSaveSiteSettings(sanitized).catch(() => {});
+      return sanitized;
     } catch {
       return fallback();
     }
@@ -92,13 +197,15 @@ export const settingsService = {
   async updateSiteSettings(settings: Partial<SiteSettings>): Promise<SiteSettings> {
     const current = await this.getSiteSettings();
     const updated: SiteSettings = { ...current, ...settings, updated_at: new Date().toISOString() };
-    localStorage.setItem(LOCAL_SITE_SETTINGS_KEY, JSON.stringify(updated));
+    
+    // Safely persist without ever throwing QuotaExceededError
+    const saved = await safeSaveSiteSettings(updated);
 
     if (isSupabaseConfigured) {
       try {
         await supabase.from('site_settings').upsert({
           id: current.id || 'primary_site_settings',
-          ...updated,
+          ...saved,
         });
       } catch (err) {
         console.warn('Supabase site_settings upsert error:', err);
@@ -106,11 +213,11 @@ export const settingsService = {
     }
 
     await this.logAdminAction('Updated Website CMS & Theme Settings', 'settings', 'site_config', JSON.stringify({
-      theme: updated.theme_name,
-      site_name: updated.site_name,
-      primary_color: updated.primary_color,
+      theme: saved.theme_name,
+      site_name: saved.site_name,
+      primary_color: saved.primary_color,
     }));
-    return updated;
+    return saved;
   },
 
   async resetSiteSettings(): Promise<SiteSettings> {
@@ -119,7 +226,7 @@ export const settingsService = {
       id: 'primary_site_settings',
       updated_at: new Date().toISOString(),
     };
-    localStorage.setItem(LOCAL_SITE_SETTINGS_KEY, JSON.stringify(resetData));
+    const saved = await safeSaveSiteSettings(resetData);
 
     if (isSupabaseConfigured) {
       try {
@@ -130,7 +237,7 @@ export const settingsService = {
     }
 
     await this.logAdminAction('Reset Website Settings to Default', 'settings', 'site_config', 'Restored original StreamVault defaults');
-    return resetData;
+    return saved;
   },
 
   // Brand Asset Upload (Logo, Favicon)
@@ -158,16 +265,24 @@ export const settingsService = {
           }
         }
       } catch (err) {
-        console.warn('Supabase storage upload failed, falling back to data URL:', err);
+        console.warn('Supabase storage upload failed, falling back to optimized local storage:', err);
       }
     }
 
-    // Local / fallback client-side Data URL conversion
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = (err) => reject(err);
-      reader.readAsDataURL(file);
+    // Also persist raw file in IndexedDB for reliable offline retrieval
+    try {
+      const idbKey = `brand_${assetType}_${Date.now()}`;
+      await mediaStorage.saveMediaBlob(idbKey, file);
+    } catch (err) {
+      console.warn('IndexedDB brand asset backup warning:', err);
+    }
+
+    // Client-side: optimize image into a compact, crisp data URL (typically 15-35KB)
+    const isFavicon = assetType === 'favicon';
+    return optimizeImageFile(file, {
+      maxWidth: isFavicon ? 128 : 600,
+      maxHeight: isFavicon ? 128 : 200,
+      quality: 0.85,
     });
   },
 
@@ -200,7 +315,11 @@ export const settingsService = {
   async updateAnalyticsSettings(settings: Partial<AnalyticsSettings>): Promise<AnalyticsSettings> {
     const current = await this.getAnalyticsSettings();
     const updated: AnalyticsSettings = { ...current, ...settings, updated_at: new Date().toISOString() };
-    localStorage.setItem(LOCAL_ANALYTICS_SETTINGS_KEY, JSON.stringify(updated));
+    try {
+      localStorage.setItem(LOCAL_ANALYTICS_SETTINGS_KEY, JSON.stringify(updated));
+    } catch (e) {
+      console.warn('Could not save analytics settings to localStorage:', e);
+    }
 
     if (isSupabaseConfigured) {
       try {
@@ -213,49 +332,28 @@ export const settingsService = {
       }
     }
 
-    // Apply GA4 tag script dynamically if configured
-    if (updated.enabled && updated.ga_measurement_id.startsWith('G-')) {
-      this.initGoogleAnalytics(updated.ga_measurement_id);
-    }
+    // Apply GA4 tag script dynamically via centralized service
+    analyticsService.initialize(updated);
 
     await this.logAdminAction(
       'Updated Google Analytics Config',
       'settings',
       'ga4_config',
-      `Measurement ID: ${updated.ga_measurement_id || 'Disabled'}`
+      `Measurement ID: ${updated.ga_measurement_id || 'Disabled'} | Enabled: ${updated.enabled}`
     );
     return updated;
   },
 
   initGoogleAnalytics(measurementId: string) {
-    if (!measurementId || !measurementId.startsWith('G-')) return;
-    if (typeof window === 'undefined') return;
-
-    if (!document.getElementById('ga-gtag-script')) {
-      const script = document.createElement('script');
-      script.id = 'ga-gtag-script';
-      script.async = true;
-      script.src = `https://www.googletagmanager.com/gtag/js?id=${measurementId}`;
-      document.head.appendChild(script);
-
-      (window as any).dataLayer = (window as any).dataLayer || [];
-      function gtag(...args: any[]) {
-        (window as any).dataLayer.push(args);
-      }
-      (window as any).gtag = gtag;
-      gtag('js', new Date());
-      gtag('config', measurementId, { send_page_view: false });
-    }
+    analyticsService.initialize({
+      ...DEFAULT_ANALYTICS_SETTINGS,
+      enabled: true,
+      ga_measurement_id: measurementId,
+    });
   },
 
   trackGoogleAnalyticsEvent(eventName: string, eventParams: Record<string, any> = {}) {
-    if (typeof window !== 'undefined' && typeof (window as any).gtag === 'function') {
-      try {
-        (window as any).gtag('event', eventName, eventParams);
-      } catch (e) {
-        console.warn('GA4 event send error:', e);
-      }
-    }
+    analyticsService.trackEvent(eventName, eventParams);
   },
 
   // AdSense Settings
@@ -287,7 +385,11 @@ export const settingsService = {
   async updateAdSenseSettings(settings: Partial<AdSenseSettings>): Promise<AdSenseSettings> {
     const current = await this.getAdSenseSettings();
     const updated: AdSenseSettings = { ...current, ...settings, updated_at: new Date().toISOString() };
-    localStorage.setItem(LOCAL_ADSENSE_SETTINGS_KEY, JSON.stringify(updated));
+    try {
+      localStorage.setItem(LOCAL_ADSENSE_SETTINGS_KEY, JSON.stringify(updated));
+    } catch (e) {
+      console.warn('Could not save AdSense settings to localStorage:', e);
+    }
 
     if (isSupabaseConfigured) {
       try {
@@ -354,8 +456,17 @@ export const settingsService = {
 
     const raw = localStorage.getItem(LOCAL_ACTIVITY_LOGS_KEY);
     const list: AdminActivityLog[] = raw ? JSON.parse(raw) : DEFAULT_LOGS;
-    const updated = [newLog, ...list].slice(0, 100);
-    localStorage.setItem(LOCAL_ACTIVITY_LOGS_KEY, JSON.stringify(updated));
+    const updated = [newLog, ...list].slice(0, 50);
+    try {
+      localStorage.setItem(LOCAL_ACTIVITY_LOGS_KEY, JSON.stringify(updated));
+    } catch {
+      // If saving logs hits quota, keep only the latest 5 logs or clear
+      try {
+        localStorage.setItem(LOCAL_ACTIVITY_LOGS_KEY, JSON.stringify([newLog]));
+      } catch {
+        // Silently skip if quota completely exhausted
+      }
+    }
 
     if (isSupabaseConfigured) {
       try {
