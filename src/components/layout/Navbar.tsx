@@ -165,36 +165,36 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPath, navigate }) => {
           backdropFilter: 'var(--header-backdrop-blur, blur(16px))',
         }}
       >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+        <div className="responsive-frame h-16 flex items-center justify-between gap-2 sm:gap-4">
           {/* Brand Logo */}
-          <div className="flex items-center gap-8">
+          <div className="flex items-center gap-4 sm:gap-8 min-w-0">
             <button
               id="brand-logo-btn"
               onClick={() => navigate('/')}
-              className="flex items-center gap-2.5 group text-left focus:outline-none"
+              className="flex items-center gap-2 sm:gap-2.5 group text-left focus:outline-none min-w-0"
             >
               {activeLogo ? (
                 <img
                   src={activeLogo}
                   alt={siteName}
-                  className="h-9 max-w-[160px] object-contain group-hover:scale-105 transition-transform"
+                  className="h-8 sm:h-9 max-w-[120px] sm:max-w-[160px] object-contain group-hover:scale-105 transition-transform shrink-0"
                   onError={(e) => {
                     (e.target as HTMLElement).style.display = 'none';
                   }}
                 />
               ) : (
                 <div
-                  className="w-10 h-10 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform text-white font-bold"
+                  className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform text-white font-bold shrink-0"
                   style={{
                     backgroundColor: 'var(--color-primary, #e11d48)',
                   }}
                 >
-                  <Film className="w-5 h-5 text-white" />
+                  <Film className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
                 </div>
               )}
-              <div>
+              <div className="min-w-0 truncate">
                 <span
-                  className="text-lg font-black tracking-tight flex items-center gap-1 font-['Cabinet_Grotesk',sans-serif]"
+                  className="text-base sm:text-lg font-black tracking-tight flex items-center gap-1 font-['Cabinet_Grotesk',sans-serif] truncate"
                   style={{ color: 'var(--color-text, #ffffff)' }}
                 >
                   {siteName}
@@ -204,7 +204,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPath, navigate }) => {
           </div>
 
           {/* Right Section: Search, Role Portals, Profile */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
             {/* Quick Search */}
             <form onSubmit={handleSearchSubmit} className="relative hidden sm:block">
               <input
@@ -213,7 +213,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPath, navigate }) => {
                 placeholder="Search titles, categories..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-48 lg:w-64 border rounded-xl pl-9 pr-3 py-1.5 text-xs placeholder-slate-500 focus:outline-none focus:w-72 transition-all"
+                className="w-40 md:w-52 lg:w-64 border rounded-xl pl-9 pr-3 py-1.5 text-xs placeholder-slate-500 focus:outline-none focus:w-60 md:focus:w-72 transition-all"
                 style={{
                   backgroundColor: 'var(--color-input-background, #151724)',
                   borderColor: 'var(--color-input-border, #23283c)',
@@ -227,9 +227,9 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPath, navigate }) => {
             <button
               id="mobile-search-toggle"
               onClick={() => setIsSearchOpen(!isSearchOpen)}
-              className="sm:hidden p-2 rounded-lg hover:bg-white/5 transition-colors"
+              className="sm:hidden p-2 rounded-xl hover:bg-white/5 transition-colors touch-target"
               style={{ color: 'var(--color-text-muted, #94a3b8)' }}
-              aria-label="Search"
+              aria-label="Toggle search"
             >
               <Search className="w-5 h-5" />
             </button>
@@ -394,11 +394,11 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPath, navigate }) => {
                 )}
               </div>
             ) : (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 sm:gap-2">
                 <button
                   id="nav-signin-btn"
                   onClick={() => navigate('/login')}
-                  className="px-4 py-1.5 border text-xs font-semibold transition-colors"
+                  className="px-2.5 sm:px-4 py-1.5 border text-[11px] sm:text-xs font-semibold transition-colors whitespace-nowrap"
                   style={{
                     backgroundColor: 'var(--color-surface-secondary, #181b28)',
                     borderColor: 'var(--color-border, #1e2233)',
@@ -411,7 +411,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPath, navigate }) => {
                 <button
                   id="nav-signup-btn"
                   onClick={() => navigate('/signup')}
-                  className="px-4 py-1.5 text-xs font-semibold shadow-lg transition-all hover:opacity-90"
+                  className="px-2.5 sm:px-4 py-1.5 text-[11px] sm:text-xs font-semibold shadow-lg transition-all hover:opacity-90 whitespace-nowrap hidden xs:inline-block sm:inline-block"
                   style={{
                     backgroundColor: 'var(--button-primary-bg, #e11d48)',
                     color: 'var(--button-primary-text, #ffffff)',
@@ -448,30 +448,41 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPath, navigate }) => {
           </div>
         </div>
 
-        {/* Mobile Search Input Expanded */}
+        {/* Mobile Search Input Expanded with Close Button */}
         {isSearchOpen && (
           <div
-            className="sm:hidden px-4 pb-3 border-t"
+            className="sm:hidden px-3.5 py-2.5 border-t"
             style={{
               backgroundColor: 'var(--color-surface, #0c0e17)',
               borderColor: 'var(--color-border, #1e2233)',
             }}
           >
-            <form onSubmit={handleSearchSubmit} className="relative mt-2">
-              <input
-                type="text"
-                placeholder="Search videos, categories..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full border pl-9 pr-3 py-2 text-xs focus:outline-none"
-                style={{
-                  backgroundColor: 'var(--color-input-background, #151724)',
-                  borderColor: 'var(--color-input-border, #23283c)',
-                  color: 'var(--color-text, #ffffff)',
-                  borderRadius: 'var(--input-radius, 12px)',
-                }}
-              />
-              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <form onSubmit={handleSearchSubmit} className="relative flex items-center gap-2">
+              <div className="relative flex-1">
+                <input
+                  type="text"
+                  placeholder="Search videos, categories..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  autoFocus
+                  className="w-full border pl-9 pr-3 py-2 text-xs focus:outline-none"
+                  style={{
+                    backgroundColor: 'var(--color-input-background, #151724)',
+                    borderColor: 'var(--color-input-border, #23283c)',
+                    color: 'var(--color-text, #ffffff)',
+                    borderRadius: 'var(--input-radius, 12px)',
+                  }}
+                />
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsSearchOpen(false)}
+                className="p-2 text-xs text-slate-400 hover:text-white shrink-0"
+                aria-label="Close search"
+              >
+                Cancel
+              </button>
             </form>
           </div>
         )}

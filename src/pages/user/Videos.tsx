@@ -155,27 +155,37 @@ export const Videos: React.FC<VideosProps> = ({
 
   const getGridClass = () => {
     if (activeDesign.layout.mode === 'dense-grid') {
-      return 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3';
+      return 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 3xl:grid-cols-8 gap-2.5 sm:gap-3 lg:gap-4';
     }
     if (activeDesign.layout.mode === 'cinema-theatre') {
-      return 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6';
+      return 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4 sm:gap-6';
     }
     if (activeDesign.layout.spacingDensity === 'compact') {
-      return 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3.5';
+      return 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 2xl:grid-cols-6 gap-3 sm:gap-4';
     }
-    return 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5 sm:gap-6';
+    return 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5 3xl:grid-cols-6 gap-4 sm:gap-5 lg:gap-6';
+  };
+
+  const getSkeletonGridClass = () => {
+    if (activeDesign.layout.mode === 'dense-grid') {
+      return 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-2.5 sm:gap-3';
+    }
+    if (activeDesign.layout.mode === 'cinema-theatre') {
+      return 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4 sm:gap-6';
+    }
+    return 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5 3xl:grid-cols-6 gap-4 sm:gap-5 lg:gap-6';
   };
 
   return (
-    <div id="videos-catalog-page" className="space-y-6 pb-16">
+    <div id="videos-catalog-page" className="space-y-6 pb-16 w-full max-w-full">
       {/* Adsterra: Videos Page Top */}
       <AdsterraSlot placementKey="videos_top" />
 
       {/* 1. Page Title & Search Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight flex items-center gap-2.5">
-            <Film className="w-7 h-7 text-rose-500" />
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-black text-white tracking-tight flex items-center gap-2 sm:gap-2.5">
+            <Film className="w-6 h-6 sm:w-7 sm:h-7 text-rose-500 shrink-0" />
             <span>Videos</span>
           </h1>
         </div>
@@ -188,13 +198,13 @@ export const Videos: React.FC<VideosProps> = ({
             placeholder="Search by title, tags, description..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-[#12141e] border border-slate-700/80 rounded-2xl pl-10 pr-10 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-rose-500 transition-colors"
+            className="w-full bg-[#12141e] border border-slate-700/80 rounded-2xl pl-10 pr-10 py-2 sm:py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-rose-500 transition-colors"
           />
           <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
           {search && (
             <button
               onClick={() => setSearch('')}
-              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white touch-target p-1"
               aria-label="Clear search"
             >
               <X className="w-4 h-4" />
@@ -208,7 +218,7 @@ export const Videos: React.FC<VideosProps> = ({
 
       {/* 3. Dynamic Filter Groups from Database */}
       {filters.length > 0 && (
-        <div className="space-y-2.5 p-4 bg-[#10121b] border border-slate-800/80 rounded-3xl text-xs">
+        <div className="space-y-2 p-3 sm:p-4 bg-[#10121b] border border-slate-800/80 rounded-2xl sm:rounded-3xl text-xs w-full overflow-hidden">
           {filters.map((filter) => {
             const enabledOptions = (filter.options || []).filter((o) => o.enabled);
             if (enabledOptions.length === 0) return null;
@@ -219,9 +229,10 @@ export const Videos: React.FC<VideosProps> = ({
               <div
                 key={filter.id}
                 id={`filter-row-${filter.slug}`}
-                className="flex items-center gap-2 overflow-x-auto py-1 scrollbar-none"
+                className="flex items-center gap-2 overflow-x-auto py-1 no-scrollbar -mx-1 px-1 touch-pan-x"
+                style={{ WebkitOverflowScrolling: 'touch' }}
               >
-                <span className="text-slate-400 font-bold uppercase tracking-wider text-[11px] shrink-0 mr-1 flex items-center gap-1.5">
+                <span className="text-slate-400 font-bold uppercase tracking-wider text-[10px] sm:text-[11px] shrink-0 mr-1 flex items-center gap-1.5">
                   <Tag className="w-3.5 h-3.5 text-rose-500" />
                   {filter.name}:
                 </span>
@@ -229,7 +240,7 @@ export const Videos: React.FC<VideosProps> = ({
                 {/* 'All' option */}
                 <button
                   onClick={() => handleSelectFilterOption(filter.slug, '')}
-                  className={`px-3 py-1.5 rounded-xl font-medium shrink-0 transition-colors ${
+                  className={`px-3 py-1.5 rounded-xl font-medium shrink-0 transition-colors touch-target ${
                     !selectedVal
                       ? 'bg-rose-600 text-white shadow-sm font-semibold'
                       : 'bg-slate-800/60 text-slate-300 hover:bg-slate-800'
@@ -245,7 +256,7 @@ export const Videos: React.FC<VideosProps> = ({
                     <button
                       key={opt.id}
                       onClick={() => handleSelectFilterOption(filter.slug, opt.value)}
-                      className={`px-3 py-1.5 rounded-xl font-medium shrink-0 border transition-all ${
+                      className={`px-3 py-1.5 rounded-xl font-medium shrink-0 border transition-all touch-target ${
                         isSelected
                           ? 'bg-rose-600 border-rose-500 text-white shadow-sm font-semibold'
                           : 'bg-slate-800/60 border-slate-700/50 text-slate-300 hover:bg-slate-800 hover:text-white'
@@ -263,8 +274,8 @@ export const Videos: React.FC<VideosProps> = ({
 
       {/* 4. Video Grid with In-Feed Ad Placements */}
       {loading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+        <div className={getSkeletonGridClass()}>
+          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((i) => (
             <div key={i} className="aspect-video bg-slate-900 rounded-2xl animate-pulse" />
           ))}
         </div>

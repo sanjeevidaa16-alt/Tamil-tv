@@ -134,13 +134,13 @@ export const VideoDetails: React.FC<VideoDetailsProps> = ({ id, navigate }) => {
   }
 
   return (
-    <div id="video-details-page" className="space-y-8 pb-16 max-w-6xl mx-auto">
+    <div id="video-details-page" className="space-y-6 sm:space-y-8 pb-16 w-full max-w-6xl 2xl:max-w-7xl mx-auto">
       {/* Navigation Breadcrumb */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         <button
           id="back-to-videos-btn"
           onClick={() => navigate('/')}
-          className="inline-flex items-center gap-2 text-xs font-semibold text-slate-400 hover:text-white transition-colors"
+          className="inline-flex items-center gap-2 text-xs font-semibold text-slate-400 hover:text-white transition-colors touch-target"
         >
           <ArrowLeft className="w-4 h-4" />
           <span>Back to Videos</span>
@@ -149,7 +149,7 @@ export const VideoDetails: React.FC<VideoDetailsProps> = ({ id, navigate }) => {
         <button
           id="share-video-btn"
           onClick={handleShare}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 text-xs font-medium transition-colors"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 text-xs font-medium transition-colors touch-target"
         >
           {copied ? <CheckCircle2 className="w-4 h-4 text-emerald-400" /> : <Share2 className="w-4 h-4" />}
           <span>{copied ? 'Link Copied' : 'Share Video'}</span>
@@ -206,9 +206,9 @@ export const VideoDetails: React.FC<VideoDetailsProps> = ({ id, navigate }) => {
       <AdsterraSlot placementKey="video_after_player" />
 
       {/* Video Details & Meta Section */}
-      <section className="bg-[#11131c] border border-slate-800/90 rounded-3xl p-6 sm:p-8 space-y-6">
+      <section className="bg-[#11131c] border border-slate-800/90 rounded-2xl sm:rounded-3xl p-4 sm:p-6 lg:p-8 space-y-5 sm:space-y-6">
         <div className="space-y-3">
-          <div className="flex flex-wrap items-center gap-2.5">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
             {video.category?.name && (
               <span
                 onClick={() => video.category?.slug && navigate(`/categories/${video.category.slug}`)}
@@ -228,7 +228,7 @@ export const VideoDetails: React.FC<VideoDetailsProps> = ({ id, navigate }) => {
             </span>
           </div>
 
-          <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight leading-snug">
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-black text-white tracking-tight leading-snug">
             {video.title}
           </h1>
 
@@ -301,7 +301,7 @@ export const VideoDetails: React.FC<VideoDetailsProps> = ({ id, navigate }) => {
             <Film className="w-5 h-5 text-rose-500" /> More Like This
           </h2>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
             {relatedVideos.map((rVideo) => (
               <VideoCard
                 key={rVideo.id}

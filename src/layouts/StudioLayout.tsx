@@ -81,8 +81,8 @@ export const StudioLayout: React.FC<StudioLayoutProps> = ({
 
   return (
     <div id="studio-shell" className="min-h-screen bg-[#07080e] text-slate-100 flex flex-col md:flex-row">
-      {/* 1. SIDEBAR (Desktop) */}
-      <aside className="hidden md:flex flex-col w-64 bg-[#0d0f18] border-r border-slate-800/90 p-4 shrink-0 justify-between">
+      {/* 1. SIDEBAR (Desktop / Tablet) */}
+      <aside className="hidden md:flex flex-col w-56 lg:w-64 xl:w-72 bg-[#0d0f18] border-r border-slate-800/90 p-3 sm:p-4 shrink-0 justify-between">
         <div className="space-y-6">
           {/* Studio Brand */}
           <div className="flex items-center justify-between px-2">
@@ -124,7 +124,7 @@ export const StudioLayout: React.FC<StudioLayoutProps> = ({
           </div>
 
           {/* Navigation Items */}
-          <nav className="space-y-1">
+          <nav className="space-y-1 overflow-y-auto max-h-[calc(100vh-280px)] pr-1 custom-scrollbar">
             {menuItems.map((item, idx) => {
               const Icon = item.icon;
               const isActive = currentSection === item.id;
@@ -143,17 +143,17 @@ export const StudioLayout: React.FC<StudioLayoutProps> = ({
                   <button
                     id={`studio-tab-${item.id}`}
                     onClick={() => onSelectSection(item.id)}
-                    className={`w-full flex items-center justify-between px-3.5 py-2 rounded-xl text-xs font-semibold transition-all ${
+                    className={`w-full flex items-center justify-between px-3.5 py-2 rounded-xl text-xs font-semibold transition-all touch-target ${
                       isActive
                         ? 'bg-rose-600 text-white shadow-lg shadow-rose-950/50'
                         : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
                     }`}
                   >
-                    <div className="flex items-center gap-3">
-                      <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-slate-400'}`} />
-                      <span>{item.label}</span>
+                    <div className="flex items-center gap-3 truncate">
+                      <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-slate-400'}`} />
+                      <span className="truncate">{item.label}</span>
                     </div>
-                    {isActive && <ChevronRight className="w-3.5 h-3.5 text-white/80" />}
+                    {isActive && <ChevronRight className="w-3.5 h-3.5 text-white/80 shrink-0 ml-1" />}
                   </button>
                 </React.Fragment>
               );
@@ -166,9 +166,9 @@ export const StudioLayout: React.FC<StudioLayoutProps> = ({
           {/* Supabase Status Button */}
           <button
             onClick={() => setConfigModalOpen(true)}
-            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs text-slate-400 hover:text-white hover:bg-slate-800/60 transition-colors"
+            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs text-slate-400 hover:text-white hover:bg-slate-800/60 transition-colors touch-target"
           >
-            <Database className="w-4 h-4 text-amber-400" />
+            <Database className="w-4 h-4 text-amber-400 shrink-0" />
             <span className="truncate">{isSupabaseConfigured ? 'Supabase Connected' : 'Demo DB Mode'}</span>
           </button>
 
@@ -176,27 +176,32 @@ export const StudioLayout: React.FC<StudioLayoutProps> = ({
           <button
             id="studio-logout-btn"
             onClick={handleSignOut}
-            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs text-rose-400 hover:bg-rose-950/30 transition-colors"
+            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs text-rose-400 hover:bg-rose-950/30 transition-colors touch-target"
           >
-            <LogOut className="w-4 h-4" />
+            <LogOut className="w-4 h-4 shrink-0" />
             <span>Sign Out</span>
           </button>
         </div>
       </aside>
 
       {/* 2. MOBILE TOPBAR */}
-      <div className="md:hidden flex items-center justify-between px-4 py-3 bg-[#0d0f18] border-b border-slate-800">
-        <div className="flex items-center gap-2">
+      <div className="md:hidden flex items-center justify-between px-4 py-3 bg-[#0d0f18] border-b border-slate-800 sticky top-0 z-40">
+        <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-lg bg-rose-600 flex items-center justify-center text-white">
             <Film className="w-4 h-4" />
           </div>
-          <span className="font-bold text-sm text-white">
-            {isManagerPortal ? 'Manager Studio' : 'Admin Console'}
-          </span>
+          <div>
+            <span className="font-bold text-sm text-white leading-none block">
+              {isManagerPortal ? 'Manager Studio' : 'Admin Console'}
+            </span>
+            <span className="text-[10px] text-slate-400 font-medium">
+              {profile?.full_name || 'Studio Officer'}
+            </span>
+          </div>
         </div>
         <button
           onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)}
-          className="p-2 text-slate-400 hover:text-white rounded-lg"
+          className="p-2 text-slate-300 hover:text-white rounded-lg bg-slate-800/60 touch-target flex items-center justify-center"
           aria-label="Toggle mobile studio menu"
         >
           {mobileSidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -205,40 +210,53 @@ export const StudioLayout: React.FC<StudioLayoutProps> = ({
 
       {/* Mobile Drawer */}
       {mobileSidebarOpen && (
-        <div className="md:hidden bg-[#0e101b] border-b border-slate-800 p-4 space-y-2">
-          {menuItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = currentSection === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => {
-                  onSelectSection(item.id);
-                  setMobileSidebarOpen(false);
-                }}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold ${
-                  isActive ? 'bg-rose-600 text-white' : 'text-slate-300 hover:bg-slate-800'
-                }`}
-              >
-                <Icon className="w-4 h-4" />
-                <span>{item.label}</span>
-              </button>
-            );
-          })}
-          <div className="pt-2 border-t border-slate-800">
+        <div className="md:hidden bg-[#0e101b] border-b border-slate-800 p-4 space-y-2 max-h-[75vh] overflow-y-auto shadow-2xl z-30">
+          <div className="space-y-1">
+            {menuItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = currentSection === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    onSelectSection(item.id);
+                    setMobileSidebarOpen(false);
+                  }}
+                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold touch-target ${
+                    isActive ? 'bg-rose-600 text-white shadow-md' : 'text-slate-300 hover:bg-slate-800'
+                  }`}
+                >
+                  <Icon className="w-4 h-4 shrink-0" />
+                  <span>{item.label}</span>
+                </button>
+              );
+            })}
+          </div>
+          <div className="pt-3 border-t border-slate-800 space-y-2">
+            <button
+              onClick={() => {
+                setMobileSidebarOpen(false);
+                setConfigModalOpen(true);
+              }}
+              className="w-full py-2.5 px-3 rounded-xl bg-slate-800/80 text-xs text-amber-300 font-semibold flex items-center justify-center gap-2 touch-target"
+            >
+              <Database className="w-4 h-4" />
+              <span>{isSupabaseConfigured ? 'Supabase Connected' : 'Configure Supabase'}</span>
+            </button>
             <button
               onClick={handleSignOut}
-              className="w-full py-2 rounded-xl bg-rose-950/50 text-xs text-rose-400 font-semibold"
+              className="w-full py-2.5 rounded-xl bg-rose-950/50 hover:bg-rose-900/60 text-xs text-rose-300 font-semibold touch-target flex items-center justify-center gap-2"
             >
-              Sign Out
+              <LogOut className="w-4 h-4" />
+              <span>Sign Out</span>
             </button>
           </div>
         </div>
       )}
 
       {/* 3. MAIN WORKSPACE */}
-      <main className="flex-1 overflow-y-auto min-h-screen bg-[#090a10] p-4 sm:p-6 lg:p-8">
-        <div className="max-w-7xl mx-auto space-y-6">{children}</div>
+      <main className="flex-1 overflow-y-auto min-h-screen bg-[#090a10] p-3.5 sm:p-5 md:p-6 lg:p-8 xl:p-10">
+        <div className="responsive-studio-frame space-y-6 sm:space-y-8">{children}</div>
       </main>
 
       {/* Supabase Config Modal */}

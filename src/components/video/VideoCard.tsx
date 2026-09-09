@@ -200,8 +200,8 @@ export const VideoCard: React.FC<VideoCardProps> = ({ video, onClick, previewVar
 
         {/* Duration Badge */}
         {cardConfig.showDurationBadge && video.duration > 0 && (
-          <div className="absolute bottom-2.5 right-2.5 px-2 py-0.5 rounded-md bg-black/80 backdrop-blur-sm text-[11px] font-mono font-medium text-white flex items-center gap-1 border border-white/10">
-            <Clock className="w-3 h-3 text-slate-300" />
+          <div className="absolute bottom-2 right-2 sm:bottom-2.5 sm:right-2.5 px-1.5 sm:px-2 py-0.5 rounded-md bg-black/80 backdrop-blur-sm text-[10px] sm:text-[11px] font-mono font-medium text-white flex items-center gap-1 border border-white/10 shrink-0">
+            <Clock className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-slate-300" />
             <span>{formatDuration(video.duration)}</span>
           </div>
         )}
@@ -209,7 +209,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({ video, onClick, previewVar
         {/* Category Pill */}
         {cardConfig.showCategoryBadge && video.category?.name && (
           <div
-            className="absolute top-2.5 left-2.5 px-2.5 py-0.5 text-[11px] font-semibold border backdrop-blur-md"
+            className="absolute top-2 left-2 sm:top-2.5 sm:left-2.5 px-2 sm:px-2.5 py-0.5 text-[10px] sm:text-[11px] font-semibold border backdrop-blur-md truncate max-w-[55%]"
             style={{
               borderRadius: activeDesign.components.tagRadius,
               backgroundColor: 'rgba(17, 19, 28, 0.85)',
@@ -223,15 +223,15 @@ export const VideoCard: React.FC<VideoCardProps> = ({ video, onClick, previewVar
 
         {/* Broadcast Time / Serial Badge (Tamil TV Classic & Channel Hub) */}
         {(variant === 'classic-tv' || variant === 'channel-hub') && (
-          <div className="absolute bottom-2.5 left-2.5 px-2 py-0.5 rounded bg-amber-500/90 text-slate-950 font-bold text-[10px] flex items-center gap-1 shadow-md">
-            <Tv className="w-3 h-3" />
+          <div className="absolute bottom-2 left-2 sm:bottom-2.5 sm:left-2.5 px-1.5 sm:px-2 py-0.5 rounded bg-amber-500/90 text-slate-950 font-bold text-[9px] sm:text-[10px] flex items-center gap-1 shadow-md">
+            <Tv className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
             <span>தினமும் 8:00 PM</span>
           </div>
         )}
 
         {/* Newspaper TV Breaking / Video Tag */}
         {variant === 'newspaper-tv' && (
-          <div className="absolute top-2.5 right-2.5 px-2 py-0.5 bg-rose-600 text-white font-bold text-[10px] uppercase tracking-wider">
+          <div className="absolute top-2 right-2 sm:top-2.5 sm:right-2.5 px-1.5 sm:px-2 py-0.5 bg-rose-600 text-white font-bold text-[9px] sm:text-[10px] uppercase tracking-wider">
             வீடியோ செய்தி
           </div>
         )}
@@ -239,7 +239,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({ video, onClick, previewVar
         {/* Featured Badge */}
         {video.is_featured && variant !== 'newspaper-tv' && (
           <div
-            className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded-full font-bold text-[10px] tracking-wider uppercase shadow-md"
+            className="absolute top-2 right-2 sm:top-2.5 sm:right-2.5 px-2 py-0.5 rounded-full font-bold text-[9px] sm:text-[10px] tracking-wider uppercase shadow-md"
             style={{
               backgroundColor: 'var(--color-warning, #f59e0b)',
               color: '#000000',
@@ -251,31 +251,31 @@ export const VideoCard: React.FC<VideoCardProps> = ({ video, onClick, previewVar
 
         {/* Quick Social Actions for Social Video & Mobile First */}
         {cardConfig.showActionButtons && (
-          <div className="absolute right-2 top-10 flex flex-col gap-1.5 z-10">
+          <div className="absolute right-2 top-8 sm:top-10 flex flex-col gap-1.5 z-10">
             <button
               onClick={handleLike}
-              className={`w-7 h-7 rounded-full flex items-center justify-center backdrop-blur-md transition-transform hover:scale-110 ${
+              className={`w-6 h-6 sm:w-7 sm:h-7 rounded-full flex items-center justify-center backdrop-blur-md transition-transform hover:scale-110 ${
                 isLiked ? 'bg-rose-600 text-white' : 'bg-black/60 text-white'
               }`}
             >
-              <Heart className={`w-3.5 h-3.5 ${isLiked ? 'fill-white' : ''}`} />
+              <Heart className={`w-3 h-3 sm:w-3.5 sm:h-3.5 ${isLiked ? 'fill-white' : ''}`} />
             </button>
             <button
               onClick={handleShare}
-              className="w-7 h-7 rounded-full bg-black/60 text-white flex items-center justify-center backdrop-blur-md transition-transform hover:scale-110"
+              className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-black/60 text-white flex items-center justify-center backdrop-blur-md transition-transform hover:scale-110"
             >
-              {isShared ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Share2 className="w-3.5 h-3.5" />}
+              {isShared ? <Check className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-emerald-400" /> : <Share2 className="w-3 h-3 sm:w-3.5 sm:h-3.5" />}
             </button>
           </div>
         )}
       </div>
 
       {/* 2. Content Details */}
-      <div className="p-3.5 sm:p-4 flex-1 flex flex-col justify-between">
+      <div className="p-2.5 sm:p-3.5 lg:p-4 flex-1 flex flex-col justify-between">
         <div>
           {/* Episode indicator for TV Classic & Channel Hub */}
           {(variant === 'classic-tv' || variant === 'channel-hub') && (
-            <div className="flex items-center gap-1.5 text-[11px] font-bold text-rose-400 mb-1">
+            <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] font-bold text-rose-400 mb-1">
               <span>எபிசோட் #{((video.views_count || 1) % 250) + 1}</span>
               <span className="text-slate-600">•</span>
               <span className="text-slate-400">சன் & விஜய் டிவி</span>
@@ -284,14 +284,14 @@ export const VideoCard: React.FC<VideoCardProps> = ({ video, onClick, previewVar
 
           {/* Newspaper TV Editorial Byline */}
           {variant === 'newspaper-tv' && (
-            <div className="text-[10px] text-slate-400 font-mono mb-1 flex items-center gap-1">
+            <div className="text-[9px] sm:text-[10px] text-slate-400 font-mono mb-1 flex items-center gap-1">
               <Calendar className="w-3 h-3 text-rose-500" />
               <span>{formatTimeAgo(video.created_at)}</span>
             </div>
           )}
 
           <h3
-            className={`font-semibold text-sm sm:text-base line-clamp-2 transition-colors leading-snug ${
+            className={`font-semibold text-xs sm:text-sm md:text-base line-clamp-2 transition-colors leading-snug ${
               variant === 'newspaper-tv' ? 'font-serif font-bold text-slate-100' : ''
             }`}
             style={{ color: 'var(--color-text, #ffffff)' }}
@@ -301,7 +301,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({ video, onClick, previewVar
 
           {video.description && (
             <p
-              className="text-xs line-clamp-2 mt-1 leading-relaxed opacity-80"
+              className="text-[11px] sm:text-xs line-clamp-2 mt-1 leading-relaxed opacity-80"
               style={{ color: 'var(--color-text-muted, #94a3b8)' }}
             >
               {video.description}
@@ -311,23 +311,23 @@ export const VideoCard: React.FC<VideoCardProps> = ({ video, onClick, previewVar
 
         {/* Meta Info (Views, Date, Uploader) */}
         <div
-          className="flex items-center justify-between pt-2.5 mt-2 border-t text-xs font-medium"
+          className="flex items-center justify-between pt-2 sm:pt-2.5 mt-2 border-t text-[11px] sm:text-xs font-medium"
           style={{
             borderColor: 'var(--color-border, rgba(255, 255, 255, 0.08))',
             color: 'var(--color-text-muted, #94a3b8)',
           }}
         >
-          <div className="flex items-center gap-1.5">
-            <Eye className="w-3.5 h-3.5 opacity-60" />
+          <div className="flex items-center gap-1 sm:gap-1.5">
+            <Eye className="w-3 h-3 sm:w-3.5 sm:h-3.5 opacity-60" />
             <span>{formatViews(video.views_count)}</span>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2">
             <span>{formatTimeAgo(video.created_at)}</span>
             {video.uploader?.full_name && (
               <>
                 <span className="opacity-40">•</span>
-                <span className="truncate max-w-[85px] opacity-90" title={video.uploader.full_name}>
+                <span className="truncate max-w-[65px] sm:max-w-[90px] opacity-90" title={video.uploader.full_name}>
                   {video.uploader.full_name}
                 </span>
               </>

@@ -118,9 +118,9 @@ function AppContent() {
         return <ManagerLogin navigate={navigate} />;
       }
       return (
-        <div className="min-h-screen bg-[#07080e] text-slate-100 flex flex-col">
+        <div className="min-h-screen bg-[#07080e] text-slate-100 flex flex-col overflow-x-hidden w-full">
           <Navbar currentPath={currentPath} navigate={navigate} />
-          <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8">
+          <main className="flex-1 responsive-frame py-6 sm:py-8 w-full">
             <AccessDenied
               requiredRole="manager"
               currentRole={role}
@@ -234,7 +234,7 @@ function AppContent() {
   };
 
   return (
-    <div className="min-h-screen bg-[#07080e] text-slate-100 flex flex-col selection:bg-rose-500 selection:text-white">
+    <div className="min-h-screen bg-[#07080e] text-slate-100 flex flex-col selection:bg-rose-500 selection:text-white overflow-x-hidden w-full">
       {/* 1. Header Top Placement */}
       <AdPlacementSlot placementKey="header_top" />
 
@@ -246,7 +246,7 @@ function AppContent() {
       {/* 2. Header Bottom Placement */}
       <AdPlacementSlot placementKey="header_bottom" />
 
-      <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6">
+      <main className="flex-1 responsive-frame py-4 sm:py-6 lg:py-8 w-full">
         {/* Adsterra Center Placement (Dedicated Main View Placement) */}
         <AdsterraSlot placementKey="center" />
 

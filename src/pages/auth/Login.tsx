@@ -64,9 +64,9 @@ export const Login: React.FC<LoginProps> = ({ navigate }) => {
   };
 
   return (
-    <div id="login-page" className="min-h-[85vh] flex items-center justify-center px-4 py-12">
+    <div id="login-page" className="min-h-[80vh] flex items-center justify-center px-3.5 sm:px-4 py-8 sm:py-12">
       <div
-        className="w-full max-w-md border p-8 shadow-2xl relative transition-all"
+        className="w-full max-w-md border p-5 sm:p-8 shadow-2xl relative transition-all"
         style={{
           backgroundColor: 'var(--color-surface, #11131d)',
           borderColor: 'var(--color-border, #1e2233)',

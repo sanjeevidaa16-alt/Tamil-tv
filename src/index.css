@@ -130,12 +130,151 @@
   --button-hover: var(--color-button-hover);
 }
 
+html,
+body {
+  width: 100%;
+  max-width: 100vw;
+  min-width: 320px;
+  overflow-x: hidden;
+  -webkit-text-size-adjust: 100%;
+}
+
 body {
   font-family: var(--font-family);
   background-color: var(--color-background);
   color: var(--color-text);
   line-height: var(--line-height);
   transition: background-color var(--transition-normal), color var(--transition-normal);
+}
+
+/* ==========================================================================
+   PRODUCTION-READY RESPONSIVE FRAME SYSTEM
+   Tier 1: Mobile (< 640px)
+   Tier 2: Tablet (640px - 1023px)
+   Tier 3: Laptop (1024px - 1279px)
+   Tier 4: Desktop (1280px - 1535px)
+   Tier 5: Large Desktop / Wide Screens (>= 1536px to 1920px+)
+   ========================================================================== */
+
+/* Universal Responsive Page Container */
+.responsive-frame {
+  width: 100%;
+  max-width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 0.875rem; /* 14px mobile gutter */
+  padding-right: 0.875rem;
+}
+
+@media (min-width: 640px) {
+  .responsive-frame {
+    padding-left: 1.5rem; /* 24px tablet gutter */
+    padding-right: 1.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .responsive-frame {
+    padding-left: 2rem; /* 32px laptop/desktop gutter */
+    padding-right: 2rem;
+  }
+}
+
+@media (min-width: 1280px) {
+  .responsive-frame {
+    max-width: 80rem; /* 1280px desktop standard */
+  }
+}
+
+@media (min-width: 1536px) {
+  .responsive-frame {
+    max-width: 105rem; /* 1680px wide desktop */
+    padding-left: 2.5rem; /* 40px wide gutter */
+    padding-right: 2.5rem;
+  }
+}
+
+@media (min-width: 1920px) {
+  .responsive-frame {
+    max-width: 115rem; /* 1840px ultrawide screens */
+    padding-left: 3rem; /* 48px ultrawide gutter */
+    padding-right: 3rem;
+  }
+}
+
+/* Admin / Manager Studio Wide Container */
+.responsive-studio-frame {
+  width: 100%;
+  max-width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 0.875rem;
+  padding-right: 0.875rem;
+}
+
+@media (min-width: 640px) {
+  .responsive-studio-frame {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .responsive-studio-frame {
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+}
+
+@media (min-width: 1536px) {
+  .responsive-studio-frame {
+    max-width: 108rem; /* 1728px */
+    padding-left: 2.5rem;
+    padding-right: 2.5rem;
+  }
+}
+
+/* Responsive Table Wrapper with Touch Momentum & Custom Scrollbar */
+.responsive-table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  position: relative;
+  scrollbar-width: thin;
+}
+
+.responsive-table-wrapper::-webkit-scrollbar {
+  height: 6px;
+}
+
+.responsive-table-wrapper::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 9999px;
+}
+
+/* Fluid Responsive Video Player Ratio */
+.responsive-player-aspect {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  max-height: 85vh;
+}
+
+/* Touch Target Accessibility Safeguard */
+.touch-target {
+  min-height: 44px;
+  min-width: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Scrollbar Hide Utility */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
 /* UI Style Specific Overrides */

@@ -427,7 +427,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       id="cinema-video-player-container"
       onMouseMove={handleMouseMove}
       onMouseLeave={() => isPlaying && setShowControls(false)}
-      className="relative w-full aspect-video rounded-2xl overflow-hidden shadow-2xl group select-none flex items-center justify-center border transition-all"
+      className="relative w-full aspect-video max-h-[85vh] rounded-2xl overflow-hidden shadow-2xl group select-none flex items-center justify-center border transition-all"
       style={{
         backgroundColor: 'var(--player-bg, #000000)',
         borderColor: 'var(--color-border, rgba(255, 255, 255, 0.08))',
@@ -612,7 +612,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             </button>
 
             {/* Volume Control */}
-            <div className="flex items-center gap-2 group/volume">
+            <div className="flex items-center gap-1 sm:gap-2 group/volume">
               <button
                 id="player-mute-btn"
                 onClick={toggleMute}
@@ -620,9 +620,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                 aria-label={isMuted ? 'Unmute' : 'Mute'}
               >
                 {isMuted || volume === 0 ? (
-                  <VolumeX className="w-5 h-5 text-rose-400" />
+                  <VolumeX className="w-4 h-4 sm:w-5 sm:h-5 text-rose-400" />
                 ) : (
-                  <Volume2 className="w-5 h-5" />
+                  <Volume2 className="w-4 h-4 sm:w-5 sm:h-5" />
                 )}
               </button>
               <input
@@ -633,7 +633,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                 step="0.05"
                 value={isMuted ? 0 : volume}
                 onChange={handleVolumeChange}
-                className="w-16 sm:w-20 h-1 bg-slate-700 rounded-lg cursor-pointer"
+                className="w-14 sm:w-20 h-1 bg-slate-700 rounded-lg cursor-pointer hidden sm:block"
                 style={{
                   accentColor: 'var(--player-progress, var(--color-primary, #e11d48))',
                 }}
@@ -642,7 +642,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             </div>
 
             {/* Current Time / Duration */}
-            <span className="text-xs font-mono text-slate-300 ml-1">
+            <span className="text-[10px] sm:text-xs font-mono text-slate-300 ml-0.5 sm:ml-1 shrink-0">
               {formatDuration(currentTime)} / {formatDuration(duration)}
             </span>
           </div>

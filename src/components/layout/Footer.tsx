@@ -89,14 +89,14 @@ export const Footer: React.FC<FooterProps> = ({ navigate, previewSettings }) => 
   return (
     <footer
       id="app-footer"
-      className="w-full mt-auto py-12 text-xs transition-colors border-t"
+      className="w-full mt-auto py-10 sm:py-12 text-xs transition-colors border-t overflow-hidden"
       style={{
         backgroundColor: 'var(--footer-bg, var(--color-surface, #07080c))',
         borderColor: 'var(--footer-border, var(--color-border, rgba(255, 255, 255, 0.08)))',
         color: 'var(--color-text-muted, #94a3b8)',
       }}
     >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="responsive-frame">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-8 mb-10">
           {/* Brand & Description column */}
           <div className="md:col-span-4 space-y-4">
