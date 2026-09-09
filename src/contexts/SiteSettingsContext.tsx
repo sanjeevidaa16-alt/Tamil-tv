@@ -118,6 +118,17 @@ export const SiteSettingsProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
   useEffect(() => {
     loadSettings();
+
+    // Subscribe to Realtime Supabase Database events & cross-tab sync
+    const unsubscribe = settingsService.subscribeToGlobalSettings((incoming) => {
+      setSettings(incoming);
+      applyTheme(incoming);
+      setLoading(false);
+    });
+
+    return () => {
+      unsubscribe();
+    };
   }, []);
 
   const updateSettings = async (newSettings: Partial<SiteSettings>): Promise<SiteSettings> => {

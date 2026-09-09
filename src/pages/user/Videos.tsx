@@ -48,7 +48,7 @@ export const Videos: React.FC<VideosProps> = ({
     return () => clearTimeout(timer);
   }, [search, trackSearch, videos.length]);
 
-  // Load dynamic filters & categories from database
+  // Load dynamic filters & categories from database with Realtime subscription
   useEffect(() => {
     Promise.all([
       filterService.getFilters(false),
@@ -59,6 +59,14 @@ export const Videos: React.FC<VideosProps> = ({
         setCategories(activeCategories);
       })
       .catch(console.error);
+
+    const unsubscribe = filterService.subscribeToFilters((allFilters) => {
+      setFilters(filterService.filterByEnabled(allFilters, false));
+    });
+
+    return () => {
+      unsubscribe();
+    };
   }, []);
 
   // Fetch published videos from database

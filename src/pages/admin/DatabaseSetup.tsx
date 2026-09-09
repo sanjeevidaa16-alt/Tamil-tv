@@ -712,12 +712,94 @@ CREATE POLICY "Admin Upload Access for Adsterra Assets"
     TO authenticated
     WITH CHECK (bucket_id = 'adsterra-assets' AND public.is_admin());
 
--- 18. NOTIFY POSTGREST TO RELOAD SCHEMA CACHE IMMEDIATELY
--- Resolves: "Could not find the table 'public.profiles' in the schema cache"
--- Resolves: "Could not find the table 'public.videos' in the schema cache"
--- Resolves: "Could not find the table 'public.adsterra_settings' in the schema cache"
--- Resolves: "Could not find the table 'public.adsterra_ad_units' in the schema cache"
--- Resolves: "Could not find the table 'public.adsterra_placements' in the schema cache"
+-- 19. GLOBAL SITE SETTINGS (SINGLE SOURCE OF TRUTH FOR ALL USERS & DEVICES)
+CREATE TABLE IF NOT EXISTS public.site_settings (
+    id TEXT PRIMARY KEY DEFAULT 'primary_site_settings',
+    settings JSONB NOT NULL DEFAULT '{}'::jsonb,
+    version INTEGER NOT NULL DEFAULT 1,
+    site_name TEXT DEFAULT 'StreamVault',
+    theme_name TEXT DEFAULT 'Tamil OTT',
+    user_panel_design TEXT DEFAULT 'tamil-ott',
+    primary_color TEXT DEFAULT '#e11d48',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL
+);
+
+DO $$
+BEGIN
+    ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS settings JSONB NOT NULL DEFAULT '{}'::jsonb;
+    ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 1;
+    ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS site_name TEXT DEFAULT 'StreamVault';
+    ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS theme_name TEXT DEFAULT 'Tamil OTT';
+    ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS user_panel_design TEXT DEFAULT 'tamil-ott';
+    ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS primary_color TEXT DEFAULT '#e11d48';
+    ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+    ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS updated_by UUID;
+END $$;
+
+ALTER TABLE public.site_settings ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Public Read Site Settings" ON public.site_settings;
+CREATE POLICY "Public Read Site Settings"
+    ON public.site_settings FOR SELECT
+    TO anon, authenticated
+    USING (true);
+
+DROP POLICY IF EXISTS "Admin Upsert Site Settings" ON public.site_settings;
+CREATE POLICY "Admin Upsert Site Settings"
+    ON public.site_settings FOR ALL
+    TO authenticated
+    USING (public.is_admin())
+    WITH CHECK (public.is_admin());
+
+GRANT ALL ON TABLE public.site_settings TO anon, authenticated, service_role;
+
+-- 20. GOOGLE ANALYTICS SETTINGS
+CREATE TABLE IF NOT EXISTS public.analytics_settings (
+    id TEXT PRIMARY KEY DEFAULT 'primary_analytics_settings',
+    ga_measurement_id TEXT DEFAULT '',
+    enabled BOOLEAN NOT NULL DEFAULT false,
+    track_page_views BOOLEAN NOT NULL DEFAULT true,
+    track_searches BOOLEAN NOT NULL DEFAULT true,
+    track_video_plays BOOLEAN NOT NULL DEFAULT true,
+    track_video_completions BOOLEAN NOT NULL DEFAULT true,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL
+);
+
+ALTER TABLE public.analytics_settings ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Public Read Analytics Settings" ON public.analytics_settings;
+CREATE POLICY "Public Read Analytics Settings"
+    ON public.analytics_settings FOR SELECT
+    TO anon, authenticated
+    USING (true);
+
+DROP POLICY IF EXISTS "Admin Upsert Analytics Settings" ON public.analytics_settings;
+CREATE POLICY "Admin Upsert Analytics Settings"
+    ON public.analytics_settings FOR ALL
+    TO authenticated
+    USING (public.is_admin())
+    WITH CHECK (public.is_admin());
+
+GRANT ALL ON TABLE public.analytics_settings TO anon, authenticated, service_role;
+
+-- 21. REALTIME REPLICATION FOR GLOBAL SETTINGS
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_publication_tables 
+        WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'site_settings'
+    ) THEN
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.site_settings;
+    END IF;
+EXCEPTION
+    WHEN OTHERS THEN NULL;
+END $$;
+
+-- 22. NOTIFY POSTGREST TO RELOAD SCHEMA CACHE IMMEDIATELY
 NOTIFY pgrst, 'reload schema';
 `;
 
@@ -729,6 +811,8 @@ interface HealthCheckResult {
   videosTable: boolean;
   categoriesTable: boolean;
   videoViewsTable: boolean;
+  siteSettingsTable: boolean;
+  analyticsSettingsTable: boolean;
   adsterraSettingsTable: boolean;
   adsterraAdUnitsTable: boolean;
   adsterraPlacementsTable: boolean;
@@ -754,6 +838,8 @@ export const DatabaseSetup: React.FC = () => {
     videosTable: true,
     categoriesTable: true,
     videoViewsTable: true,
+    siteSettingsTable: true,
+    analyticsSettingsTable: true,
     adsterraSettingsTable: true,
     adsterraAdUnitsTable: true,
     adsterraPlacementsTable: true,
@@ -794,6 +880,8 @@ export const DatabaseSetup: React.FC = () => {
       videosTable: false,
       categoriesTable: false,
       videoViewsTable: false,
+      siteSettingsTable: false,
+      analyticsSettingsTable: false,
       adsterraSettingsTable: false,
       adsterraAdUnitsTable: false,
       adsterraPlacementsTable: false,
@@ -813,6 +901,8 @@ export const DatabaseSetup: React.FC = () => {
         newHealth.videosTable = true;
         newHealth.categoriesTable = true;
         newHealth.videoViewsTable = true;
+        newHealth.siteSettingsTable = true;
+        newHealth.analyticsSettingsTable = true;
         newHealth.adsterraSettingsTable = true;
         newHealth.adsterraAdUnitsTable = true;
         newHealth.adsterraPlacementsTable = true;
@@ -838,11 +928,13 @@ export const DatabaseSetup: React.FC = () => {
 
       // 2. Test PostgreSQL Tables Access
       try {
-        const [profilesRes, videosRes, categoriesRes, viewsRes, adstSetRes, adstUnitRes, adstPlacRes] = await Promise.allSettled([
+        const [profilesRes, videosRes, categoriesRes, viewsRes, siteSetRes, analSetRes, adstSetRes, adstUnitRes, adstPlacRes] = await Promise.allSettled([
           supabase.from('profiles').select('id', { count: 'exact', head: true }).limit(1),
           supabase.from('videos').select('id', { count: 'exact', head: true }).limit(1),
           supabase.from('categories').select('id', { count: 'exact', head: true }).limit(1),
           supabase.from('video_views').select('id', { count: 'exact', head: true }).limit(1),
+          supabase.from('site_settings').select('id', { count: 'exact', head: true }).limit(1),
+          supabase.from('analytics_settings').select('id', { count: 'exact', head: true }).limit(1),
           supabase.from('adsterra_settings').select('id', { count: 'exact', head: true }).limit(1),
           supabase.from('adsterra_ad_units').select('id', { count: 'exact', head: true }).limit(1),
           supabase.from('adsterra_placements').select('id', { count: 'exact', head: true }).limit(1),
@@ -852,6 +944,8 @@ export const DatabaseSetup: React.FC = () => {
         newHealth.videosTable = videosRes.status === 'fulfilled' && !videosRes.value.error;
         newHealth.categoriesTable = categoriesRes.status === 'fulfilled' && !categoriesRes.value.error;
         newHealth.videoViewsTable = viewsRes.status === 'fulfilled' && !viewsRes.value.error;
+        newHealth.siteSettingsTable = siteSetRes.status === 'fulfilled' && !siteSetRes.value.error;
+        newHealth.analyticsSettingsTable = analSetRes.status === 'fulfilled' && !analSetRes.value.error;
         newHealth.adsterraSettingsTable = adstSetRes.status === 'fulfilled' && !adstSetRes.value.error;
         newHealth.adsterraAdUnitsTable = adstUnitRes.status === 'fulfilled' && !adstUnitRes.value.error;
         newHealth.adsterraPlacementsTable = adstPlacRes.status === 'fulfilled' && !adstPlacRes.value.error;
@@ -1263,6 +1357,28 @@ export const DatabaseSetup: React.FC = () => {
             </div>
             <span className={`text-xs font-bold flex items-center gap-1 ${health.videoViewsTable ? 'text-emerald-400' : 'text-rose-400'}`}>
               {health.videoViewsTable ? '✓ Active' : '✕ Missing'}
+            </span>
+          </div>
+
+          {/* site_settings (Single Source of Truth) */}
+          <div className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 flex items-center justify-between ring-1 ring-emerald-500/20">
+            <div>
+              <p className="font-mono text-xs font-bold text-emerald-300">site_settings</p>
+              <p className="text-[10px] text-slate-400">Single Source of Truth (All Devices)</p>
+            </div>
+            <span className={`text-xs font-bold flex items-center gap-1 ${health.siteSettingsTable ? 'text-emerald-400' : 'text-rose-400'}`}>
+              {health.siteSettingsTable ? '✓ Active' : '✕ Missing'}
+            </span>
+          </div>
+
+          {/* analytics_settings */}
+          <div className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 flex items-center justify-between">
+            <div>
+              <p className="font-mono text-xs font-bold text-emerald-300">analytics_settings</p>
+              <p className="text-[10px] text-slate-400">Google Analytics 4 config</p>
+            </div>
+            <span className={`text-xs font-bold flex items-center gap-1 ${health.analyticsSettingsTable ? 'text-emerald-400' : 'text-rose-400'}`}>
+              {health.analyticsSettingsTable ? '✓ Active' : '✕ Missing'}
             </span>
           </div>
 

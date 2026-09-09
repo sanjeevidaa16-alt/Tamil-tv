@@ -93,7 +93,83 @@ function saveLocalFilters(filters: VideoFilter[]): void {
   localStorage.setItem(LOCAL_FILTERS_KEY, JSON.stringify(filters));
 }
 
+// Active listeners across components
+type FilterListener = (filters: VideoFilter[]) => void;
+const filterListeners = new Set<FilterListener>();
+
+let filterRealtimeChannel: any = null;
+let isFilterRealtimeSubscribed = false;
+
+function ensureFilterRealtime() {
+  if (!isSupabaseConfigured || isFilterRealtimeSubscribed) return;
+
+  try {
+    filterRealtimeChannel = supabase
+      .channel('streamvault_filters_realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'video_filters' },
+        () => {
+          console.log('[Realtime] video_filters table modified, notifying listeners');
+          filterService.getFilters(true).then((all) => {
+            filterListeners.forEach((fn) => {
+              try {
+                fn(all);
+              } catch (e) {
+                console.warn('[Filters] Listener callback error:', e);
+              }
+            });
+          });
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'video_filter_options' },
+        () => {
+          console.log('[Realtime] video_filter_options table modified, notifying listeners');
+          filterService.getFilters(true).then((all) => {
+            filterListeners.forEach((fn) => {
+              try {
+                fn(all);
+              } catch (e) {
+                console.warn('[Filters] Listener callback error:', e);
+              }
+            });
+          });
+        }
+      )
+      .subscribe((status: string) => {
+        if (status === 'SUBSCRIBED') {
+          isFilterRealtimeSubscribed = true;
+        } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+          isFilterRealtimeSubscribed = false;
+        }
+      });
+  } catch (err) {
+    console.warn('[Realtime] Filter subscription error:', err);
+  }
+}
+
+function notifyFilterListenersLocally() {
+  filterService.getFilters(true).then((all) => {
+    filterListeners.forEach((fn) => {
+      try {
+        fn(all);
+      } catch (e) {
+        console.warn('[Filters] Listener callback error:', e);
+      }
+    });
+  });
+}
+
 export const filterService = {
+  subscribeToFilters(listener: FilterListener): () => void {
+    filterListeners.add(listener);
+    ensureFilterRealtime();
+    return () => {
+      filterListeners.delete(listener);
+    };
+  },
   /**
    * Fetch all filters with their options.
    * If includeDisabled is false, only returns enabled filters and options.
@@ -255,6 +331,7 @@ export const filterService = {
     const current = getLocalFilters();
     const updated = [...current, newFilterObj];
     saveLocalFilters(updated);
+    notifyFilterListenersLocally();
 
     return newFilterObj;
   },
@@ -310,6 +387,7 @@ export const filterService = {
     if (index !== -1) {
       current[index] = updatedFilter;
       saveLocalFilters(current);
+      notifyFilterListenersLocally();
     }
 
     return updatedFilter;
@@ -331,6 +409,7 @@ export const filterService = {
     const current = getLocalFilters();
     const filtered = current.filter((f) => f.id !== id);
     saveLocalFilters(filtered);
+    notifyFilterListenersLocally();
     return true;
   },
 
@@ -348,6 +427,7 @@ export const filterService = {
     }).filter(Boolean) as VideoFilter[];
 
     saveLocalFilters(updated);
+    notifyFilterListenersLocally();
 
     if (isSupabaseConfigured) {
       try {
@@ -407,6 +487,7 @@ export const filterService = {
     if (parent) {
       parent.options = [...(parent.options || []), newOption];
       saveLocalFilters(current);
+      notifyFilterListenersLocally();
     }
 
     return newOption;
@@ -434,6 +515,7 @@ export const filterService = {
 
     if (updatedOption) {
       saveLocalFilters(current);
+      notifyFilterListenersLocally();
     }
 
     if (isSupabaseConfigured) {
@@ -475,6 +557,7 @@ export const filterService = {
       }
     }
     saveLocalFilters(current);
+    notifyFilterListenersLocally();
     return true;
   },
 
@@ -495,6 +578,7 @@ export const filterService = {
       }).filter(Boolean) as VideoFilterOption[];
 
       saveLocalFilters(current);
+      notifyFilterListenersLocally();
     }
 
     if (isSupabaseConfigured) {

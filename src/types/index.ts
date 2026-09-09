@@ -318,6 +318,8 @@ export interface SiteSettings {
   default_video_visibility: VideoVisibility;
   enable_analytics: boolean;
   enable_adsense: boolean;
+  version?: number;
+  updated_by?: string | null;
   updated_at?: string;
 }
 
