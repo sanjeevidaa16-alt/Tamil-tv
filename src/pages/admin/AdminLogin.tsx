@@ -8,7 +8,7 @@ interface AdminLoginProps {
 }
 
 export const AdminLogin: React.FC<AdminLoginProps> = ({ navigate }) => {
-  const { signIn } = useAuth();
+  const { signIn, signOut } = useAuth();
   const { showToast } = useToast();
 
   const [email, setEmail] = useState('');
@@ -31,11 +31,13 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ navigate }) => {
     setLoading(false);
 
     if (error) {
-      const msg = error.message || 'Invalid administrator credentials. Please check and try again.';
+      console.error('Admin authentication failure:', error);
+      const msg = error.message || 'Invalid admin credentials or insufficient permissions.';
       setErrorMessage(msg);
       showToast(msg, 'error');
     } else if (role !== 'admin') {
-      const msg = 'Access denied. Administrator privileges are required.';
+      await signOut();
+      const msg = 'This account does not have administrator privileges. Please sign in with an authorized admin account.';
       setErrorMessage(msg);
       showToast(msg, 'error');
     } else {
@@ -54,12 +56,14 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ navigate }) => {
           <div className="inline-flex w-14 h-14 rounded-2xl bg-gradient-to-tr from-rose-600 to-amber-600 items-center justify-center shadow-lg shadow-rose-950/60 mb-4 ring-2 ring-rose-500/30">
             <Shield className="w-7 h-7 text-white" />
           </div>
-          <h1 className="text-2xl font-black text-white tracking-tight">StreamVault</h1>
+          <h1 className="text-xl font-black text-white tracking-wider uppercase font-mono">
+            ADMIN ACCESS
+          </h1>
           <p className="text-xs text-rose-300/80 mt-1 uppercase font-semibold tracking-wider">
-            Administrator Login
+            Secure Portal
           </p>
           <p className="text-[11px] text-slate-400 mt-0.5">
-            Authorized administrators only
+            Authorized administrative personnel only
           </p>
         </div>
 
@@ -74,14 +78,14 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ navigate }) => {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
-              Admin Email
+              Email
             </label>
             <div className="relative">
               <input
                 id="admin-email"
                 type="email"
                 required
-                placeholder="sanjeevidaa@gmail.com"
+                placeholder="admin@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full bg-[#181a26] border border-slate-700/80 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-rose-500 transition-colors"
@@ -129,24 +133,6 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ navigate }) => {
             </div>
           </div>
 
-          {/* Quick Credential Helper Pill */}
-          <div className="p-3 bg-slate-900/90 border border-slate-800 rounded-xl flex items-center justify-between text-xs">
-            <div className="text-[11px] text-slate-400">
-              <span className="text-slate-300 font-mono font-semibold">sanjeevidaa@gmail.com</span>
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                setEmail('sanjeevidaa@gmail.com');
-                setPassword('sriRAM@2002');
-                showToast('Admin credentials filled', 'info');
-              }}
-              className="px-2.5 py-1 bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 font-semibold text-[11px] rounded-lg transition-colors border border-rose-500/30"
-            >
-              Fill Credentials
-            </button>
-          </div>
-
           <button
             type="submit"
             id="admin-signin-btn"
@@ -157,7 +143,7 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ navigate }) => {
               <Loader2 className="w-4 h-4 animate-spin" />
             ) : (
               <>
-                <span>Sign In to Admin Panel</span>
+                <span>SIGN IN</span>
                 <ArrowRight className="w-4 h-4" />
               </>
             )}
@@ -170,7 +156,7 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ navigate }) => {
             className="text-xs text-slate-400 hover:text-white transition-colors flex items-center justify-center gap-1.5 mx-auto"
           >
             <Film className="w-3.5 h-3.5 text-rose-500" />
-            <span>Return to StreamVault Videos</span>
+            <span>Return to Videos</span>
           </button>
         </div>
       </div>

@@ -3,6 +3,7 @@ import {
   Film,
   Search,
   Shield,
+  Lock,
   Briefcase,
   User as UserIcon,
   LogOut,
@@ -50,6 +51,50 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPath, navigate }) => {
     await signOut();
     setIsProfileMenuOpen(false);
     navigate('/');
+  };
+
+  // Subtle security icon button style dynamically adapted across all 13 User Panel UI designs
+  const getSecurityButtonStyle = () => {
+    switch (activeDesign.id) {
+      case 'glass-tv':
+        return {
+          backgroundColor: 'rgba(255, 255, 255, 0.06)',
+          borderColor: 'rgba(255, 255, 255, 0.16)',
+          backdropFilter: 'blur(12px)',
+          borderRadius: 'var(--button-radius, 12px)',
+        };
+      case 'neon-tv':
+        return {
+          backgroundColor: 'rgba(225, 29, 72, 0.08)',
+          borderColor: 'rgba(225, 29, 72, 0.4)',
+          boxShadow: '0 0 10px rgba(225, 29, 72, 0.25)',
+          borderRadius: 'var(--button-radius, 12px)',
+        };
+      case 'cinema-dark':
+        return {
+          backgroundColor: '#0c0d14',
+          borderColor: '#1e202e',
+          borderRadius: 'var(--button-radius, 10px)',
+        };
+      case 'minimal-tv':
+        return {
+          backgroundColor: 'transparent',
+          borderColor: 'transparent',
+          borderRadius: 'var(--button-radius, 8px)',
+        };
+      case 'mobile-first-tv':
+        return {
+          backgroundColor: 'var(--color-surface-secondary, #181b28)',
+          borderColor: 'var(--color-border, #24293d)',
+          borderRadius: 'var(--button-radius, 12px)',
+        };
+      default:
+        return {
+          backgroundColor: 'var(--color-surface-secondary, #181b28)',
+          borderColor: 'var(--color-border, #1e2233)',
+          borderRadius: 'var(--button-radius, 12px)',
+        };
+    }
   };
 
   return (
@@ -189,27 +234,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPath, navigate }) => {
               <Search className="w-5 h-5" />
             </button>
 
-            {/* ROLE PORTAL SHORTCUTS (Only when authenticated as staff) */}
-            {/* 1. Super Admin: Admin Studio */}
-            {isAdmin && (
-              <button
-                id="navbar-admin-studio-btn"
-                onClick={() => navigate('/admin')}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold shadow-sm transition-all"
-                style={{
-                  backgroundColor: 'rgba(225, 29, 72, 0.15)',
-                  color: 'var(--color-primary, #e11d48)',
-                  borderColor: 'rgba(225, 29, 72, 0.3)',
-                  borderWidth: '1px',
-                  borderRadius: 'var(--button-radius, 12px)',
-                }}
-              >
-                <Shield className="w-3.5 h-3.5" />
-                <span>Admin Studio</span>
-              </button>
-            )}
-
-            {/* 2. Manager: Manager Studio */}
+            {/* Manager Studio shortcut (Only when authenticated as manager) */}
             {isManager && !isAdmin && (
               <button
                 id="navbar-manager-studio-btn"
@@ -397,6 +422,29 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPath, navigate }) => {
                 </button>
               </div>
             )}
+
+            {/* Small Subtle Admin Security Access Icon Button */}
+            <div className="relative group shrink-0">
+              <button
+                id="admin-security-access-btn"
+                type="button"
+                onClick={() => navigate('/admin')}
+                aria-label="Admin Access"
+                title="Admin Access"
+                className="w-8 h-8 flex items-center justify-center border transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-rose-500/50 hover:scale-105 active:scale-95 group"
+                style={getSecurityButtonStyle()}
+              >
+                <Lock className="w-3.5 h-3.5 text-slate-400 group-hover:text-rose-400 group-focus:text-rose-400 transition-colors" />
+              </button>
+
+              {/* Desktop Hover Tooltip */}
+              <div
+                role="tooltip"
+                className="pointer-events-none absolute -bottom-8 right-0 hidden md:group-hover:flex md:group-focus-within:flex items-center px-2 py-0.5 rounded-md bg-[#161826] border border-slate-700/80 text-[10px] font-medium text-slate-200 shadow-xl whitespace-nowrap z-50 transition-opacity duration-150"
+              >
+                <span>Admin Access</span>
+              </div>
+            </div>
           </div>
         </div>
 

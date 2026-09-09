@@ -1,5 +1,6 @@
-import React from 'react';
-import { ShieldAlert, ArrowLeft, Lock, LogIn } from 'lucide-react';
+import React, { useState } from 'react';
+import { ShieldAlert, ArrowLeft, Lock, LogIn, Loader2 } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface AccessDeniedProps {
   requiredRole: 'admin' | 'manager';
@@ -12,6 +13,21 @@ export const AccessDenied: React.FC<AccessDeniedProps> = ({
   currentRole,
   navigate,
 }) => {
+  const { signOut } = useAuth();
+  const [switching, setSwitching] = useState(false);
+
+  const handleSwitchAccount = async () => {
+    try {
+      setSwitching(true);
+      await signOut();
+      navigate(requiredRole === 'admin' ? '/admin' : '/manager');
+    } catch (err) {
+      navigate(requiredRole === 'admin' ? '/admin' : '/manager');
+    } finally {
+      setSwitching(false);
+    }
+  };
+
   return (
     <div id="access-denied-view" className="min-h-[70vh] flex items-center justify-center p-4">
       <div className="max-w-md w-full bg-[#11131d] border border-rose-900/50 rounded-3xl p-8 text-center space-y-6 shadow-2xl relative overflow-hidden">
@@ -58,10 +74,15 @@ export const AccessDenied: React.FC<AccessDeniedProps> = ({
 
           <button
             id="denied-switch-login-btn"
-            onClick={() => navigate(requiredRole === 'admin' ? '/admin' : '/manager')}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold shadow-lg shadow-rose-950/40 transition-all"
+            disabled={switching}
+            onClick={handleSwitchAccount}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold shadow-lg shadow-rose-950/40 transition-all disabled:opacity-50"
           >
-            <LogIn className="w-4 h-4" />
+            {switching ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <LogIn className="w-4 h-4" />
+            )}
             <span>Sign in as {requiredRole === 'admin' ? 'Admin' : 'Manager'}</span>
           </button>
         </div>

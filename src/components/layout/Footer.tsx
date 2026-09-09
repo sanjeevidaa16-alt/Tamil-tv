@@ -274,10 +274,22 @@ export const Footer: React.FC<FooterProps> = ({ navigate, previewSettings }) => 
             color: 'var(--color-text-muted, #94a3b8)',
           }}
         >
-          <p>
-            © {settings.auto_copyright_year ? `${currentYear} ` : ''}
-            {copyrightNotice}
-          </p>
+          <div className="flex items-center gap-2">
+            <p>
+              © {settings.auto_copyright_year ? `${currentYear} ` : ''}
+              {copyrightNotice}
+            </p>
+            <button
+              id="footer-admin-security-btn"
+              type="button"
+              onClick={() => navigate('/admin')}
+              aria-label="Admin Access"
+              title="Admin Access"
+              className="p-1 rounded text-slate-500 hover:text-slate-300 transition-colors focus:outline-none focus:ring-1 focus:ring-slate-500"
+            >
+              <Lock className="w-3 h-3 opacity-60 hover:opacity-100 transition-opacity" />
+            </button>
+          </div>
           {settings.footer_disclaimer && (
             <p className="text-center sm:text-right opacity-70">
               {settings.footer_disclaimer}

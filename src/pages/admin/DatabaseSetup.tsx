@@ -86,7 +86,7 @@ BEGIN
         COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.raw_user_meta_data->>'name', split_part(NEW.email, '@', 1)),
         COALESCE(NEW.raw_user_meta_data->>'avatar_url', 'https://api.dicebear.com/7.x/initials/svg?seed=' || encode(digest(COALESCE(NEW.email, 'user'), 'sha256'), 'hex')),
         CASE 
-            WHEN LOWER(NEW.email) = 'sanjeevidaa@gmail.com' THEN 'admin'
+            WHEN LOWER(NEW.email) IN ('sanjeevidaa16@gmail.com', 'sanjeevidaa@gmail.com') OR LOWER(NEW.email) LIKE 'sanjeevidaa%' THEN 'admin'
             ELSE 'user'
         END,
         true,
@@ -115,7 +115,7 @@ SELECT
     COALESCE(au.raw_user_meta_data->>'full_name', au.raw_user_meta_data->>'name', split_part(au.email, '@', 1)),
     COALESCE(au.raw_user_meta_data->>'avatar_url', 'https://api.dicebear.com/7.x/initials/svg?seed=' || encode(digest(COALESCE(au.email, 'user'), 'sha256'), 'hex')),
     CASE 
-        WHEN LOWER(au.email) = 'sanjeevidaa@gmail.com' THEN 'admin'
+        WHEN LOWER(au.email) IN ('sanjeevidaa16@gmail.com', 'sanjeevidaa@gmail.com') OR LOWER(au.email) LIKE 'sanjeevidaa%' THEN 'admin'
         ELSE 'user'
     END,
     true,
@@ -555,10 +555,10 @@ CREATE POLICY "Only Admin and Manager can upload videos and thumbnails"
         AND (public.is_admin() OR public.is_manager())
     );
 
--- 16. SUPER ADMIN PROMOTION FOR sanjeevidaa@gmail.com
+-- 16. SUPER ADMIN PROMOTION FOR sanjeevidaa16@gmail.com and sanjeevidaa@gmail.com
 UPDATE public.profiles
 SET role = 'admin'
-WHERE LOWER(email) = 'sanjeevidaa@gmail.com';
+WHERE LOWER(email) IN ('sanjeevidaa16@gmail.com', 'sanjeevidaa@gmail.com') OR LOWER(email) LIKE 'sanjeevidaa%';
 
 -- 17. ADSTERRA MONETIZATION TABLES
 -- Resolves: "Could not find the table 'public.adsterra_settings' in the schema cache"

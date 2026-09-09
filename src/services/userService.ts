@@ -18,8 +18,8 @@ function getLocalProfiles(): Profile[] {
     const list = JSON.parse(data) as Profile[];
     // Ensure admin profile has current email
     const adminIndex = list.findIndex((p) => p.role === 'admin');
-    if (adminIndex !== -1 && list[adminIndex].email !== 'sanjeevidaa@gmail.com') {
-      list[adminIndex].email = 'sanjeevidaa@gmail.com';
+    if (adminIndex !== -1 && !list[adminIndex].email?.startsWith('sanjeevidaa')) {
+      list[adminIndex].email = 'sanjeevidaa16@gmail.com';
       list[adminIndex].full_name = 'Sanjeevidaa (Super Admin)';
       localStorage.setItem(LOCAL_STORAGE_PROFILES_KEY, JSON.stringify(list));
     }

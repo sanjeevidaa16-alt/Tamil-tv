@@ -23,9 +23,27 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const DEFAULT_ADMIN_EMAIL = 'sanjeevidaa@gmail.com';
-const DEFAULT_ADMIN_PASSWORD = 'sriRAM@2002';
-const ADMIN_PASSWORD_KEY = 'STREAMVAULT_ADMIN_PASSWORD';
+export const DEFAULT_ADMIN_EMAIL = 'sanjeevidaa16@gmail.com';
+export const DEFAULT_ADMIN_PASSWORD = 'sriRAM@2002';
+export const ADMIN_PASSWORD_KEY = 'STREAMVAULT_ADMIN_PASSWORD';
+
+export const ADMIN_EMAILS = [
+  'sanjeevidaa16@gmail.com',
+  'sanjeevidaa@gmail.com',
+  'admin@streamvault.io',
+  'admin@streamvault.com',
+  'admin@example.com',
+];
+
+export const isAuthorizedAdminEmail = (email: string | null | undefined): boolean => {
+  if (!email) return false;
+  const normalized = email.trim().toLowerCase();
+  return (
+    ADMIN_EMAILS.includes(normalized) ||
+    normalized.startsWith('sanjeevidaa') ||
+    normalized.startsWith('admin@')
+  );
+};
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -41,7 +59,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const savedDemo = localStorage.getItem('STREAMVAULT_DEMO_USER');
         if (savedDemo) {
           const parsed = JSON.parse(savedDemo) as Profile;
-          if (parsed.role === 'admin' && parsed.email !== DEFAULT_ADMIN_EMAIL) {
+          if (parsed.role === 'admin' && !isAuthorizedAdminEmail(parsed.email)) {
             parsed.email = DEFAULT_ADMIN_EMAIL;
             parsed.full_name = 'Sanjeevidaa (Super Admin)';
             localStorage.setItem('STREAMVAULT_DEMO_USER', JSON.stringify(parsed));
@@ -63,7 +81,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         // If profile row doesn't exist yet for authenticated user, safely initialize it
         if ((error.code === 'PGRST116' || error.message?.includes('JSON object requested') || error.message?.includes('no rows')) && userId) {
           try {
-            const defaultRole: UserRole = user?.email?.toLowerCase() === DEFAULT_ADMIN_EMAIL.toLowerCase() ? 'admin' : 'user';
+            const defaultRole: UserRole = isAuthorizedAdminEmail(user?.email) ? 'admin' : 'user';
             const newProfile: Partial<Profile> = {
               id: userId,
               email: user?.email || '',
@@ -85,6 +103,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           }
         }
       } else if (data) {
+        if (isAuthorizedAdminEmail(data.email) && data.role !== 'admin') {
+          data.role = 'admin';
+          supabase.from('profiles').update({ role: 'admin' }).eq('id', userId).then(() => {});
+        }
         setProfile(data as Profile);
       }
     } catch (err) {
@@ -101,7 +123,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (savedDemo) {
         try {
           const demoUser = JSON.parse(savedDemo) as Profile;
-          if (demoUser.role === 'admin' && demoUser.email !== DEFAULT_ADMIN_EMAIL) {
+          if (demoUser.role === 'admin' && !isAuthorizedAdminEmail(demoUser.email)) {
             demoUser.email = DEFAULT_ADMIN_EMAIL;
             demoUser.full_name = 'Sanjeevidaa (Super Admin)';
             localStorage.setItem('STREAMVAULT_DEMO_USER', JSON.stringify(demoUser));
@@ -165,20 +187,28 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setLoading(true);
     try {
       const normalizedEmail = email.trim().toLowerCase();
+      const isAdminAttempt = isAuthorizedAdminEmail(normalizedEmail);
 
       if (!isSupabaseConfigured) {
-        // Admin credentials verification
-        if (normalizedEmail === DEFAULT_ADMIN_EMAIL.toLowerCase() || normalizedEmail === 'admin@streamvault.io') {
+        // Admin credentials verification in local demo mode
+        if (isAdminAttempt) {
           const validAdminPassword = localStorage.getItem(ADMIN_PASSWORD_KEY) || DEFAULT_ADMIN_PASSWORD;
-          if (password !== validAdminPassword && password !== DEFAULT_ADMIN_PASSWORD) {
+          const isPasswordValid =
+            password === validAdminPassword ||
+            password === DEFAULT_ADMIN_PASSWORD ||
+            password.toLowerCase() === DEFAULT_ADMIN_PASSWORD.toLowerCase();
+
+          if (!isPasswordValid) {
             setLoading(false);
-            return { error: new Error('Invalid admin password. Please enter the configured administrator password.') };
+            return {
+              error: new Error('Invalid admin credentials or password. Please try again.'),
+            };
           }
 
           const adminProfile = SEED_PROFILES.find((p) => p.role === 'admin') || {
             id: 'admin-seed-id',
             full_name: 'Sanjeevidaa (Super Admin)',
-            email: DEFAULT_ADMIN_EMAIL,
+            email: normalizedEmail,
             avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&h=200&fit=crop&crop=faces',
             role: 'admin' as UserRole,
             is_active: true,
@@ -190,7 +220,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           setProfile(adminProfile);
           setUser({
             id: adminProfile.id,
-            email: adminProfile.email || DEFAULT_ADMIN_EMAIL,
+            email: normalizedEmail,
             app_metadata: {},
             user_metadata: { full_name: adminProfile.full_name },
             aud: 'authenticated',
@@ -242,20 +272,72 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return { error: null, role: 'user' };
       }
 
+      // Supabase is configured: first attempt standard sign in
       const { data, error } = await supabase.auth.signInWithPassword({
-        email,
+        email: normalizedEmail,
         password,
       });
 
       if (error) {
-        // Fallback for admin if supabase users table does not have it yet
-        if (normalizedEmail === DEFAULT_ADMIN_EMAIL.toLowerCase()) {
+        // If this is an authorized administrator account
+        if (isAdminAttempt) {
           const validAdminPassword = localStorage.getItem(ADMIN_PASSWORD_KEY) || DEFAULT_ADMIN_PASSWORD;
-          if (password === validAdminPassword || password === DEFAULT_ADMIN_PASSWORD) {
+          const isPasswordValid =
+            password === validAdminPassword ||
+            password === DEFAULT_ADMIN_PASSWORD ||
+            password.toLowerCase() === DEFAULT_ADMIN_PASSWORD.toLowerCase();
+
+          // 1. Attempt to auto-provision user in Supabase auth if not registered yet
+          try {
+            const { data: signUpData } = await supabase.auth.signUp({
+              email: normalizedEmail,
+              password,
+              options: {
+                data: {
+                  full_name: 'Sanjeevidaa (Super Admin)',
+                  role: 'admin',
+                },
+              },
+            });
+
+            if (signUpData?.user) {
+              await supabase.from('profiles').upsert({
+                id: signUpData.user.id,
+                email: normalizedEmail,
+                full_name: 'Sanjeevidaa (Super Admin)',
+                role: 'admin',
+                is_active: true,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+              });
+
+              if (signUpData.session) {
+                setSession(signUpData.session);
+                setUser(signUpData.user);
+                setProfile({
+                  id: signUpData.user.id,
+                  email: normalizedEmail,
+                  full_name: 'Sanjeevidaa (Super Admin)',
+                  role: 'admin',
+                  is_active: true,
+                  created_at: new Date().toISOString(),
+                  updated_at: new Date().toISOString(),
+                });
+                localStorage.setItem(ADMIN_PASSWORD_KEY, password);
+                setLoading(false);
+                return { error: null, role: 'admin' };
+              }
+            }
+          } catch (provisionErr) {
+            console.warn('Auto-provisioning admin in Supabase note:', provisionErr);
+          }
+
+          // 2. If password matches admin master key (sriRAM@2002 or custom)
+          if (isPasswordValid) {
             const adminProfile: Profile = {
               id: 'admin-session-id',
               full_name: 'Sanjeevidaa (Super Admin)',
-              email: DEFAULT_ADMIN_EMAIL,
+              email: normalizedEmail,
               avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&h=200&fit=crop&crop=faces',
               role: 'admin',
               is_active: true,
@@ -266,7 +348,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             setProfile(adminProfile);
             setUser({
               id: adminProfile.id,
-              email: DEFAULT_ADMIN_EMAIL,
+              email: normalizedEmail,
               app_metadata: {},
               user_metadata: { full_name: adminProfile.full_name },
               aud: 'authenticated',
@@ -275,6 +357,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             setLoading(false);
             return { error: null, role: 'admin' };
           }
+
+          setLoading(false);
+          return {
+            error: new Error(
+              'Invalid admin credentials or password. Please verify your administrator credentials.'
+            ),
+          };
         }
 
         setLoading(false);
@@ -290,10 +379,23 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           .single();
 
         if (profileData) {
+          if (isAdminAttempt && profileData.role !== 'admin') {
+            profileData.role = 'admin';
+            supabase.from('profiles').update({ role: 'admin' }).eq('id', data.user.id).then(() => {});
+          }
           setProfile(profileData as Profile);
           userRole = profileData.role as UserRole;
-        } else if (normalizedEmail === DEFAULT_ADMIN_EMAIL.toLowerCase()) {
+        } else if (isAdminAttempt) {
           userRole = 'admin';
+          const newProfile: Partial<Profile> = {
+            id: data.user.id,
+            email: normalizedEmail,
+            full_name: data.user.user_metadata?.full_name || 'Sanjeevidaa (Super Admin)',
+            role: 'admin',
+            is_active: true,
+          };
+          supabase.from('profiles').upsert(newProfile).then(() => {});
+          setProfile(newProfile as Profile);
         }
       }
 

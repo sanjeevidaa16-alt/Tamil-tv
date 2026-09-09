@@ -73,6 +73,10 @@ function AppContent() {
 
   // 1. ADMIN PORTAL (Guarded - Entry point /admin)
   if (currentPath.startsWith('/admin')) {
+    if (currentPath === '/admin/login' && !isAdmin) {
+      return <AdminLogin navigate={navigate} />;
+    }
+
     if (!isAdmin) {
       if (!user) {
         return <AdminLogin navigate={navigate} />;
